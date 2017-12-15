@@ -23,6 +23,7 @@ class WPCampus_Speakers_Admin {
 
 		// Add items to the admin menu.
 		add_action( 'admin_menu', array( $plugin, 'add_menu_pages' ) );
+		add_action( 'parent_file', array( $plugin, 'filter_submenu_parent' ) );
 
 	}
 
@@ -35,6 +36,31 @@ class WPCampus_Speakers_Admin {
 		// Add menu section to manage all of the speaker information.
 		add_menu_page( __( 'Speakers', 'wpcampus' ), __( 'Speakers', 'wpcampus' ), 'manage_wpc_speakers', 'wpc-speakers', array( $plugin, 'print_speakers_main_page' ), 'dashicons-megaphone', 10.111 );
 
+		// Add taxonomy pages under speakers.
+		add_submenu_page( 'wpc-speakers', __( 'Subjects', 'wpcampus' ), __( 'Subjects', 'wpcampus' ), 'manage_categories', 'edit-tags.php?taxonomy=subjects&section=wpc-speakers' );
+
+	}
+
+	/**
+	 * Filters the parent file of
+	 * an admin menu sub-menu item.
+	 *
+	 * Allows us to set the speakers
+	 * section when viewing speaker taxonomies.
+	 */
+	public function filter_submenu_parent( $parent_file ) {
+
+		// Get current screen.
+		$current_screen = get_current_screen();
+
+		// Show taxonomies under "Speakers" menu.
+		if ( ! empty( $current_screen->taxonomy ) && in_array( $current_screen->taxonomy, array( 'subjects' ) ) ) {
+			if ( isset( $_GET['section'] ) && 'wpc-speakers' == $_GET['section'] ) {
+				return $_GET['section'];
+			}
+		}
+
+		return $parent_file;
 	}
 
 	/**

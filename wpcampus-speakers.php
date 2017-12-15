@@ -92,6 +92,43 @@ class WPCampus_Speakers {
 			'publicly_queryable'    => false,
 			'capability_type'       => array( 'proposal', 'proposals' ),
 		));
+
+		register_post_type( 'profile', array(
+			'label'                 => __( 'Profiles', 'wpcampus' ),
+			'labels'                => array(
+				'name'                  => _x( 'Profiles', 'Post Type General Name', 'wpcampus' ),
+				'singular_name'         => _x( 'Profile', 'Post Type Singular Name', 'wpcampus' ),
+				'menu_name'             => __( 'Profiles', 'wpcampus' ),
+				'name_admin_bar'        => __( 'Profiles', 'wpcampus' ),
+				'archives'              => __( 'Profile Archives', 'wpcampus' ),
+				'attributes'            => __( 'Profile Attributes', 'wpcampus' ),
+				'all_items'             => __( 'All Profiles', 'wpcampus' ),
+				'add_new_item'          => __( 'Add New Profile', 'wpcampus' ),
+				'new_item'              => __( 'New Profile', 'wpcampus' ),
+				'edit_item'             => __( 'Edit Profile', 'wpcampus' ),
+				'update_item'           => __( 'Update Profile', 'wpcampus' ),
+				'view_item'             => __( 'View Profile', 'wpcampus' ),
+				'view_items'            => __( 'View Profiles', 'wpcampus' ),
+				'search_items'          => __( 'Search Profiles', 'wpcampus' ),
+				'insert_into_item'      => __( 'Insert into profile', 'wpcampus' ),
+				'uploaded_to_this_item' => __( 'Uploaded to this profile', 'wpcampus' ),
+				'items_list'            => __( 'Profiles list', 'wpcampus' ),
+				'items_list_navigation' => __( 'Profiles list navigation', 'wpcampus' ),
+				'filter_items_list'     => __( 'Filter profiles list', 'wpcampus' ),
+			),
+			'supports'              => array( 'title', 'editor', 'excerpt', 'author', 'thumbnail', 'revisions' ),
+			'hierarchical'          => false,
+			'public'                => false,
+			'show_ui'               => true,
+			'show_in_menu'          => 'wpc-speakers',
+			'show_in_admin_bar'     => true,
+			'show_in_nav_menus'     => false,
+			'can_export'            => true,
+			'has_archive'           => false,
+			'exclude_from_search'   => true,
+			'publicly_queryable'    => false,
+			'capability_type'       => array( 'profile', 'profiles' ),
+		));
 	}
 }
 WPCampus_Speakers::register();

@@ -56,6 +56,7 @@ class WPCampus_Speakers {
 	 */
 	public function register_custom_post_types_taxonomies() {
 
+		// @TODO Only be able to access with authentication.
 		register_post_type( 'proposal', array(
 			'label'                 => __( 'Proposals', 'wpcampus' ),
 			'labels'                => array(
@@ -92,8 +93,10 @@ class WPCampus_Speakers {
 			'exclude_from_search'   => true,
 			'publicly_queryable'    => false,
 			'capability_type'       => array( 'proposal', 'proposals' ),
+			'show_in_rest'          => true,
 		));
 
+		// @TODO Only be able to access with authentication.
 		register_post_type( 'profile', array(
 			'label'                 => __( 'Profiles', 'wpcampus' ),
 			'labels'                => array(
@@ -129,8 +132,10 @@ class WPCampus_Speakers {
 			'exclude_from_search'   => true,
 			'publicly_queryable'    => false,
 			'capability_type'       => array( 'profile', 'profiles' ),
+			'show_in_rest'          => true,
 		));
 
+		// @TODO Only be able to access with authentication?
 		register_taxonomy( 'event', array( 'proposal' ), array(
 			'labels' => array(
 				'name'                          => _x( 'Events', 'Taxonomy General Name', 'wpcampus' ),

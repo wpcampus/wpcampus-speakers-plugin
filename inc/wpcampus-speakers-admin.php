@@ -37,6 +37,7 @@ class WPCampus_Speakers_Admin {
 		add_menu_page( __( 'Speakers', 'wpcampus' ), __( 'Speakers', 'wpcampus' ), 'manage_wpc_speakers', 'wpc-speakers', array( $plugin, 'print_speakers_main_page' ), 'dashicons-megaphone', 10.111 );
 
 		// Add taxonomy pages under speakers.
+		add_submenu_page( 'wpc-speakers', __( 'Events', 'wpcampus' ), __( 'Events', 'wpcampus' ), 'manage_categories', 'edit-tags.php?taxonomy=event&section=wpc-speakers' );
 		add_submenu_page( 'wpc-speakers', __( 'Subjects', 'wpcampus' ), __( 'Subjects', 'wpcampus' ), 'manage_categories', 'edit-tags.php?taxonomy=subjects&section=wpc-speakers' );
 
 	}
@@ -54,7 +55,7 @@ class WPCampus_Speakers_Admin {
 		$current_screen = get_current_screen();
 
 		// Show taxonomies under "Speakers" menu.
-		if ( ! empty( $current_screen->taxonomy ) && in_array( $current_screen->taxonomy, array( 'subjects' ) ) ) {
+		if ( ! empty( $current_screen->taxonomy ) && in_array( $current_screen->taxonomy, array( 'event', 'subjects' ) ) ) {
 			if ( isset( $_GET['section'] ) && 'wpc-speakers' == $_GET['section'] ) {
 				return $_GET['section'];
 			}

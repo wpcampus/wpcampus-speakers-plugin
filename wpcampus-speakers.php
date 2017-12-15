@@ -46,14 +46,15 @@ class WPCampus_Speakers {
 		$plugin = new self();
 
 		// Register our post types.
-		add_action( 'init', array( $plugin, 'register_custom_post_types' ) );
+		add_action( 'init', array( $plugin, 'register_custom_post_types_taxonomies' ) );
 
 	}
 
 	/**
-	 * Registers all of our custom post types.
+	 * Registers all of our custom
+	 * post types and taxonomies.
 	 */
-	public function register_custom_post_types() {
+	public function register_custom_post_types_taxonomies() {
 
 		register_post_type( 'proposal', array(
 			'label'                 => __( 'Proposals', 'wpcampus' ),
@@ -128,6 +129,36 @@ class WPCampus_Speakers {
 			'exclude_from_search'   => true,
 			'publicly_queryable'    => false,
 			'capability_type'       => array( 'profile', 'profiles' ),
+		));
+
+		register_taxonomy( 'event', array( 'proposal' ), array(
+			'labels' => array(
+				'name'                          => _x( 'Events', 'Taxonomy General Name', 'wpcampus' ),
+				'singular_name'                 => _x( 'Event', 'Taxonomy Singular Name', 'wpcampus' ),
+				'menu_name'                     => __( 'Events', 'wpcampus' ),
+				'all_items'                     => __( 'All Events', 'wpcampus' ),
+				'new_item_name'                 => __( 'New Event', 'wpcampus' ),
+				'add_new_item'                  => __( 'Add New Event', 'wpcampus' ),
+				'edit_item'                     => __( 'Edit Event', 'wpcampus' ),
+				'update_item'                   => __( 'Update Event', 'wpcampus' ),
+				'view_item'                     => __( 'View Event', 'wpcampus' ),
+				'separate_items_with_commas'    => __( 'Separate events with commas', 'wpcampus' ),
+				'add_or_remove_items'           => __( 'Add or remove events', 'wpcampus' ),
+				'choose_from_most_used'         => __( 'Choose from the most used events', 'wpcampus' ),
+				'popular_items'                 => __( 'Popular events', 'wpcampus' ),
+				'search_items'                  => __( 'Search Events', 'wpcampus' ),
+				'not_found'                     => __( 'No events found.', 'wpcampus' ),
+				'no_terms'                      => __( 'No events', 'wpcampus' ),
+				'items_list'                    => __( 'Events list', 'wpcampus' ),
+				'items_list_navigation'         => __( 'Events list navigation', 'wpcampus' ),
+			),
+			'hierarchical'      => false,
+			'public'            => false,
+			'show_ui'           => true,
+			'show_admin_column' => true,
+			'show_in_nav_menus' => false,
+			'show_tagcloud'     => false,
+			'show_in_rest'      => true,
 		));
 	}
 }

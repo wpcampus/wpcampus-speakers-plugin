@@ -1,0 +1,27 @@
+{
+  "name": "wpcampus-speakers-plugin",
+  "version": "1.0.0",
+  "description": "Manages the speaker functionality for the main WPCampus website.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wpcampus/wpcampus-speakers-plugin.git"
+  },
+  "scripts": {
+    "install": "composer install",
+    "test": "composer sniff"
+  },
+  "author": "WPCampus <code@wpcampus.org>",
+  "contributors": [
+    "Rachel Cherry <rachel@wpcampus.org>"
+  ],
+  "license": "GPL-2.0+",
+  "bugs": {
+    "url": "https://github.com/wpcampus/wpcampus-speakers-plugin/issues"
+  },
+  "homepage": "https://github.com/wpcampus/wpcampus-speakers-plugin#readme",
+  "devDependencies": {
+    "gulp": "^3.9.1",
+    "gulp-notify": "^3.0.0",
+    "gulp-shell": "^0.6.3"
+  }
+}

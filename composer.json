@@ -1,0 +1,19 @@
+{
+  "name": "wpcampus/wpcampus-speakers-plugin",
+  "description": "Manages the speaker functionality for the main WPCampus website.",
+  "type": "wordpress-plugin",
+  "license": "GPL-2.0+",
+  "authors": [
+    {
+      "name": "WPCampus",
+      "email": "code@wpcampus.org"
+    }
+  ],
+  "require-dev": {
+    "squizlabs/php_codesniffer": "*",
+    "wp-coding-standards/wpcs": "*"
+  },
+  "scripts": {
+    "sniff": "vendor/bin/phpcs --runtime-set installed_paths vendor/wp-coding-standards/wpcs -p ./ --standard=WordPress-Core --report=full --extensions=php --ignore=*/vendor/*,*/node_modules/*"
+  }
+}

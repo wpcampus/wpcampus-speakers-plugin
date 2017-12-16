@@ -48,6 +48,9 @@ class WPCampus_Speakers {
 		// Hide our rest routes.
 		add_filter( 'rest_route_data', array( $plugin, 'filter_rest_route_data' ), 10, 2 );
 
+		// Restrict access to our API routes.
+		add_filter( 'rest_authentication_errors', array( $plugin, 'restrict_api_access' ) );
+
 		// Register our post types.
 		add_action( 'init', array( $plugin, 'register_custom_post_types_taxonomies' ) );
 
@@ -77,6 +80,34 @@ class WPCampus_Speakers {
 		}
 
 		return $available;
+	}
+
+	/**
+	 * Restrict access to our speakers routes.
+	 */
+	public function restrict_api_access( $result ) {
+
+		// Get the current route.
+		$rest_route = $GLOBALS['wp']->query_vars['rest_route'];
+
+		// Restrict access to our speakers routes.
+		if ( ! empty( $rest_route ) && $this->is_speakers_route( $rest_route ) ) {
+
+			// Make sure the access request matches.
+			if ( ! empty( $_SERVER['HTTP_WPC_ACCESS'] ) ) {
+				if ( get_option( 'http_wpc_access' ) === $_SERVER['HTTP_WPC_ACCESS'] ) {
+					return true;
+				}
+			}
+
+			return new WP_Error(
+				'rest_cannot_access',
+				esc_html__( 'Only authenticated requests can access this REST API route.', 'wpcampus' ),
+				array( 'status' => 401 )
+			);
+		}
+
+		return $result;
 	}
 
 	/**

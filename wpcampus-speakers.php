@@ -45,9 +45,27 @@ class WPCampus_Speakers {
 	public static function register() {
 		$plugin = new self();
 
+		// Hide our rest routes.
+		add_filter( 'rest_route_data', array( $plugin, 'filter_rest_route_data' ), 10, 2 );
+
 		// Register our post types.
 		add_action( 'init', array( $plugin, 'register_custom_post_types_taxonomies' ) );
 
+	}
+
+	/**
+	 * Hide our rest routes from being seen.
+	 */
+	public function filter_rest_route_data( $available, $routes ) {
+
+		// Remove routes for "proposal" and "profile".
+		foreach( $available as $route => $route_data ) {
+			if ( preg_match( '/^\/wp(\/v2)?\/(proposal|profile)/i', $route ) ) {
+				unset( $available[ $route ] );
+			}
+		}
+
+		return $available;
 	}
 
 	/**

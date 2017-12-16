@@ -54,13 +54,24 @@ class WPCampus_Speakers {
 	}
 
 	/**
+	 * Returns true if route matches
+	 * one of our speaker post types.
+	 */
+	public function is_speakers_route( $route, $post_type = null ) {
+		if ( empty( $post_type ) ) {
+			$post_type = '(proposal|profile)';
+		}
+		return preg_match( '/^\/wp(\/v2)?\/' . $post_type . '/i', $route );
+	}
+
+	/**
 	 * Hide our rest routes from being seen.
 	 */
 	public function filter_rest_route_data( $available, $routes ) {
 
 		// Remove routes for "proposal" and "profile".
-		foreach( $available as $route => $route_data ) {
-			if ( preg_match( '/^\/wp(\/v2)?\/(proposal|profile)/i', $route ) ) {
+		foreach ( $available as $route => $route_data ) {
+			if ( $this->is_speakers_route( $route ) ) {
 				unset( $available[ $route ] );
 			}
 		}

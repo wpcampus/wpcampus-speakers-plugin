@@ -198,7 +198,6 @@ class WPCampus_Speakers {
 	 */
 	public function register_custom_post_types_taxonomies() {
 
-		// @TODO Only be able to access with authentication.
 		register_post_type( 'proposal', array(
 			'label'                 => __( 'Proposals', 'wpcampus' ),
 			'labels'                => array(
@@ -238,7 +237,6 @@ class WPCampus_Speakers {
 			'show_in_rest'          => true,
 		));
 
-		// @TODO Only be able to access with authentication.
 		register_post_type( 'profile', array(
 			'label'                 => __( 'Profiles', 'wpcampus' ),
 			'labels'                => array(

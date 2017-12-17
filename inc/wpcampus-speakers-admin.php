@@ -29,6 +29,9 @@ class WPCampus_Speakers_Admin {
 		add_filter( 'manage_proposal_posts_columns', array( $plugin, 'add_proposal_columns' ) );
 		add_action( 'manage_proposal_posts_custom_column', array( $plugin, 'populate_proposal_columns' ), 10, 2 );
 
+		// Adds dropdown to filter the speaker status.
+		add_action( 'restrict_manage_posts', array( $plugin, 'add_proposal_filters' ), 100 );
+
 	}
 
 	/**
@@ -108,11 +111,11 @@ class WPCampus_Speakers_Admin {
 	 */
 	public function populate_proposal_columns( $column, $post_id ) {
 
-		switch( $column ) {
+		switch ( $column ) {
 
 			case 'proposal_status':
 				$proposal_status = get_post_meta( $post_id, 'proposal_status', true );
-				switch( $proposal_status ) {
+				switch ( $proposal_status ) {
 
 					case 'confirmed':
 						?><span style="color:green;"><?php _e( 'Confirmed', 'wpcampus' ); ?></span><?php
@@ -143,6 +146,50 @@ class WPCampus_Speakers_Admin {
 						?><a href="<?php echo get_edit_post_link( $proposal_speaker_id ); ?>"><?php echo $speaker_display_name; ?></a><?php
 					endif;
 				}
+				break;
+		}
+	}
+
+	/**
+	 * Adds a dropdown to filter proposals.
+	 */
+	public function add_proposal_filters( $post_type ) {
+
+		switch ( $post_type ) {
+
+			case 'proposal':
+
+				$post_status = ! empty( $_REQUEST['post_status'] ) ? $_REQUEST['post_status'] : '';
+
+				// Don't filter in the trash.
+				if ( 'trash' == $post_status ) {
+					break;
+				}
+
+				$proposal_status_choices = array(
+					'confirmed' => __( 'Confirmed', 'wpcampus' ),
+					'declined'  => __( 'Declined', 'wpcampus' ),
+					'selected'  => __( 'Selected', 'wpcampus' ),
+					'submitted' => __( 'Submitted', 'wpcampus' ),
+				);
+
+				$selected_proposal_status = ! empty( $_GET['proposal_status'] ) ? $_GET['proposal_status'] : null;
+
+				?>
+				<select name="proposal_status">
+					<option value=""><?php _e( 'Sort by status', 'wpcampus' ); ?></option>
+					<?php
+
+					foreach ( $proposal_status_choices as $value => $label ) :
+						?>
+						<option value="<?php echo $value; ?>"<?php selected( $selected_proposal_status, $value ); ?>><?php echo $label; ?></option>
+						<?php
+					endforeach;
+
+					?>
+				</select>
+				<?php
+
 				break;
 		}
 	}

@@ -55,6 +55,9 @@ class WPCampus_Speakers {
 		add_filter( 'rest_profile_query', array( $plugin, 'filter_profile_rest_query' ), 10, 2 );
 		add_filter( 'rest_proposal_query', array( $plugin, 'filter_proposal_rest_query' ), 10, 2 );
 
+
+		// Filter queries.
+		add_filter( 'query_vars', array( $plugin, 'filter_query_vars' ) );
 		// Register our post types.
 		add_action( 'init', array( $plugin, 'register_custom_post_types_taxonomies' ) );
 
@@ -144,6 +147,14 @@ class WPCampus_Speakers {
 	}
 
 	/**
+
+	/**
+	 * Add query vars to the whitelist.
+	 */
+	public function filter_query_vars( $query_vars ) {
+		$query_vars[] = 'proposal_status';
+		return $query_vars;
+	}
 	 * Registers all of our custom
 	 * post types and taxonomies.
 	 */

@@ -154,6 +154,7 @@ class WPCampus_Speakers {
 	 * Add query vars to the whitelist.
 	 */
 	public function filter_query_vars( $query_vars ) {
+		$query_vars[] = 'profile_user';
 		$query_vars[] = 'proposal_status';
 		return $query_vars;
 	}
@@ -167,6 +168,20 @@ class WPCampus_Speakers {
 		$post_type = $query->get( 'post_type' );
 
 		switch ( $post_type ) {
+
+			case 'profile':
+
+				// Only if we're querying by the profile user..
+				if ( ! empty( $query->query_vars['profile_user'] ) ) {
+
+					$profile_user = $query->get( 'profile_user' );
+
+					// "Join" to get profile user.
+					$pieces['join'] .= " LEFT JOIN {$wpdb->postmeta} profile_user ON profile_user.post_id = {$wpdb->posts}.ID AND profile_user.meta_key = 'wordpress_user'";
+					$pieces['where'] .= $wpdb->prepare( ' AND profile_user.meta_value = %s', $profile_user );
+
+				}
+				break;
 
 			case 'proposal':
 

@@ -168,25 +168,7 @@ class WPCampus_Speakers_Admin {
 		switch ( $column ) {
 
 			case 'proposal_status':
-				$proposal_status = get_post_meta( $post_id, 'proposal_status', true );
-				switch ( $proposal_status ) {
-
-					case 'confirmed':
-						?><span style="color:green;"><?php _e( 'Confirmed', 'wpcampus' ); ?></span><?php
-						break;
-
-					case 'declined':
-						?><span style="color:red;"><?php _e( 'Declined', 'wpcampus' ); ?></span><?php
-						break;
-
-					case 'selected':
-						?><strong><?php _e( 'Pending', 'wpcampus' ); ?></strong><?php
-						break;
-
-					default:
-						?><em><?php _e( 'Submitted', 'wpcampus' ); ?></em><?php
-						break;
-				}
+				$this->print_proposal_status_label( get_post_meta( $post_id, 'proposal_status', true ) );
 				break;
 
 			case 'proposal_speaker':
@@ -259,6 +241,29 @@ class WPCampus_Speakers_Admin {
 				</select>
 				<?php
 
+				break;
+		}
+	}
+
+	/**
+	 * Print the label for a proposal status.
+	 */
+	public function print_proposal_status_label( $status ) {
+		switch ( $status ) {
+			case 'confirmed':
+				?><span style="color:green;"><?php _e( 'Confirmed', 'wpcampus' ); ?></span><?php
+				break;
+
+			case 'declined':
+				?><span style="color:red;"><?php _e( 'Declined', 'wpcampus' ); ?></span><?php
+				break;
+
+			case 'selected':
+				?><strong><?php _e( 'Pending', 'wpcampus' ); ?></strong><?php
+				break;
+
+			default:
+				?><em><?php _e( 'Submitted', 'wpcampus' ); ?></em><?php
 				break;
 		}
 	}

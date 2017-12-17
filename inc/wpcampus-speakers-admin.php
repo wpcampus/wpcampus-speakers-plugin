@@ -26,7 +26,9 @@ class WPCampus_Speakers_Admin {
 		add_action( 'parent_file', array( $plugin, 'filter_submenu_parent' ) );
 
 		// Add and populate custom columns.
+		add_filter( 'manage_profile_posts_columns', array( $plugin, 'add_profile_columns' ) );
 		add_filter( 'manage_proposal_posts_columns', array( $plugin, 'add_proposal_columns' ) );
+		add_action( 'manage_profile_posts_custom_column', array( $plugin, 'populate_profile_columns' ), 10, 2 );
 		add_action( 'manage_proposal_posts_custom_column', array( $plugin, 'populate_proposal_columns' ), 10, 2 );
 
 		// Adds dropdown to filter the speaker status.
@@ -77,15 +79,10 @@ class WPCampus_Speakers_Admin {
 	public function print_speakers_main_page() {}
 
 	/**
-	 * Add custom admin columns for proposals.
+	 * Used in admin to add custom
+	 * columns after the title.
 	 */
-	public function add_proposal_columns( $columns ) {
-
-		// Columns to add after title.
-		$add_columns_after_title = array(
-			'proposal_status'   => __( 'Status', 'wpcampus' ),
-			'proposal_speaker'  => __( 'Speaker', 'wpcampus' ),
-		);
+	public function add_columns_after_title( $columns, $add_after_title ) {
 
 		// Store new columns.
 		$new_columns = array();
@@ -97,13 +94,70 @@ class WPCampus_Speakers_Admin {
 
 			// Add custom columns after title.
 			if ( 'title' == $key ) {
-				foreach ( $add_columns_after_title as $column_key => $column_value ) {
+				foreach ( $add_after_title as $column_key => $column_value ) {
 					$new_columns[ $column_key ] = $column_value;
 				}
 			}
 		}
 
 		return $new_columns;
+	}
+
+	/**
+	 * Add custom admin columns for profiles.
+	 */
+	public function add_profile_columns( $columns ) {
+		return $this->add_columns_after_title( $columns, array(
+			'profile_name'  => __( 'Speaker', 'wpcampus' ),
+			'profile_user'  => __( 'User', 'wpcampus' ),
+			'profile_email' => __( 'Email', 'wpcampus' ),
+		));
+	}
+
+	/**
+	 * Add custom admin columns for proposals.
+	 */
+	public function add_proposal_columns( $columns ) {
+		return $this->add_columns_after_title( $columns, array(
+			'proposal_status'   => __( 'Status', 'wpcampus' ),
+			'proposal_speaker'  => __( 'Speaker(s)', 'wpcampus' ),
+		));
+	}
+
+	/**
+	 * Populate our custom profile columns.
+	 */
+	public function populate_profile_columns( $column, $post_id ) {
+
+		switch ( $column ) {
+
+			case 'profile_name':
+				echo get_post_meta( $post_id, 'display_name', true );
+				break;
+
+			case 'profile_user':
+				$profile_user_id = get_post_meta( $post_id, 'wordpress_user', true );
+				if ( $profile_user_id > 0 ) {
+					$user = get_userdata( $profile_user_id );
+					if ( false !== $user ) :
+
+						// Setup the filter URL.
+						$filters = $_GET;
+						$filters['profile_user'] = $profile_user_id;
+						$filter_url = add_query_arg( $filters, 'edit.php' );
+
+						?><a href="<?php echo $filter_url; ?>"><?php echo $user->display_name; ?></a><?php
+					endif;
+				}
+				break;
+
+			case 'profile_email':
+				$email = get_post_meta( $post_id, 'email', true );
+				if ( ! empty( $email ) ) :
+					?><a href="mailto:<?php echo $email; ?>"><?php echo $email; ?></a><?php
+				endif;
+				break;
+		}
 	}
 
 	/**
@@ -137,15 +191,30 @@ class WPCampus_Speakers_Admin {
 
 			case 'proposal_speaker':
 
-				$proposal_speaker_id = get_post_meta( $post_id, 'speaker_profile', true );
-				if ( $proposal_speaker_id > 0 ) {
+				if ( function_exists( 'have_rows' ) && have_rows( 'speakers', $post_id ) ) :
+					$speaker_count = 0;
+					while ( have_rows( 'speakers' ) ) :
+						the_row();
 
-					$speaker_display_name = get_post_meta( $proposal_speaker_id, 'display_name', true );
+						$speaker_id = get_sub_field( 'speaker' );
+						if ( $speaker_id > 0 ) :
 
-					if ( ! empty( $speaker_display_name ) ) :
-						?><a href="<?php echo get_edit_post_link( $proposal_speaker_id ); ?>"><?php echo $speaker_display_name; ?></a><?php
-					endif;
-				}
+							$speaker_display_name = get_post_meta( $speaker_id, 'display_name', true );
+							if ( ! empty( $speaker_display_name ) ) :
+
+								// Setup the filter URL.
+								$filters = $_GET;
+								$filters['proposal_speaker'] = $speaker_id;
+								$filter_url = add_query_arg( $filters, 'edit.php' );
+
+								echo $speaker_count > 0 ? '<br />' : null;
+								?><a href="<?php echo $filter_url; ?>"><?php echo $speaker_display_name; ?></a> (<a href="<?php echo get_edit_post_link( $speaker_id ); ?>"><?php _e( 'Edit', 'wpcampus' ); ?></a>)<?php
+
+							endif;
+						endif;
+						$speaker_count++;
+					endwhile;
+				endif;
 				break;
 		}
 	}

@@ -205,7 +205,8 @@ class WPCampus_Speakers {
 					// "Join" to get proposal status.
 					$pieces['join'] .= " LEFT JOIN {$wpdb->postmeta} proposal_status ON proposal_status.post_id = {$wpdb->posts}.ID AND proposal_status.meta_key = 'proposal_status'";
 
-					if ( 'submitted' == $proposal_status || empty( $proposal_status ) ) {
+					// If looking for simply submitted proposals, could be blank.
+					if ( 'submitted' == $proposal_status ) {
 						$pieces['where'] .= " AND ( proposal_status.post_id IS NULL OR proposal_status.meta_value = 'submitted' )";
 					} else {
 						$pieces['where'] .= $wpdb->prepare( ' AND proposal_status.meta_value = %s', strtolower( $proposal_status ) );

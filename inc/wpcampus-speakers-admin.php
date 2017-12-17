@@ -25,6 +25,10 @@ class WPCampus_Speakers_Admin {
 		add_action( 'admin_menu', array( $plugin, 'add_menu_pages' ) );
 		add_action( 'parent_file', array( $plugin, 'filter_submenu_parent' ) );
 
+		// Add and populate custom columns.
+		add_filter( 'manage_proposal_posts_columns', array( $plugin, 'add_proposal_columns' ) );
+		add_action( 'manage_proposal_posts_custom_column', array( $plugin, 'populate_proposal_columns' ), 10, 2 );
+
 	}
 
 	/**
@@ -68,5 +72,79 @@ class WPCampus_Speakers_Admin {
 	 * Print the main page of the speakers section.
 	 */
 	public function print_speakers_main_page() {}
+
+	/**
+	 * Add custom admin columns for proposals.
+	 */
+	public function add_proposal_columns( $columns ) {
+
+		// Columns to add after title.
+		$add_columns_after_title = array(
+			'proposal_status'   => __( 'Status', 'wpcampus' ),
+			'proposal_speaker'  => __( 'Speaker', 'wpcampus' ),
+		);
+
+		// Store new columns.
+		$new_columns = array();
+
+		foreach ( $columns as $key => $value ) {
+
+			// Add to new columns.
+			$new_columns[ $key ] = $value;
+
+			// Add custom columns after title.
+			if ( 'title' == $key ) {
+				foreach ( $add_columns_after_title as $column_key => $column_value ) {
+					$new_columns[ $column_key ] = $column_value;
+				}
+			}
+		}
+
+		return $new_columns;
+	}
+
+	/**
+	 * Populate our custom proposal columns.
+	 */
+	public function populate_proposal_columns( $column, $post_id ) {
+
+		switch( $column ) {
+
+			case 'proposal_status':
+				$proposal_status = get_post_meta( $post_id, 'proposal_status', true );
+				switch( $proposal_status ) {
+
+					case 'confirmed':
+						?><span style="color:green;"><?php _e( 'Confirmed', 'wpcampus' ); ?></span><?php
+						break;
+
+					case 'declined':
+						?><span style="color:red;"><?php _e( 'Declined', 'wpcampus' ); ?></span><?php
+						break;
+
+					case 'selected':
+						?><strong><?php _e( 'Pending', 'wpcampus' ); ?></strong><?php
+						break;
+
+					default:
+						?><em><?php _e( 'Submitted', 'wpcampus' ); ?></em><?php
+						break;
+				}
+				break;
+
+			case 'proposal_speaker':
+
+				$proposal_speaker_id = get_post_meta( $post_id, 'speaker_profile', true );
+				if ( $proposal_speaker_id > 0 ) {
+
+					$speaker_display_name = get_post_meta( $proposal_speaker_id, 'display_name', true );
+
+					if ( ! empty( $speaker_display_name ) ) :
+						?><a href="<?php echo get_edit_post_link( $proposal_speaker_id ); ?>"><?php echo $speaker_display_name; ?></a><?php
+					endif;
+				}
+				break;
+		}
+	}
 }
 WPCampus_Speakers_Admin::register();

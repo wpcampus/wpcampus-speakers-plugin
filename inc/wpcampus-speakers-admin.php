@@ -295,7 +295,7 @@ class WPCampus_Speakers_Admin {
 			LEFT JOIN {$wpdb->postmeta} proposalm2 ON proposalm2.post_id = proposal.ID AND proposalm2.meta_key = 'proposal_status'
 			LEFT JOIN {$wpdb->postmeta} eventm ON eventm.post_id = proposal.ID AND eventm.meta_key = 'event'
 			LEFT JOIN {$wpdb->terms} eventt ON eventt.term_id = eventm.meta_value
-			WHERE proposal.post_type = 'proposal'", $speaker_id
+			WHERE proposal.post_type = 'proposal' AND proposal.post_status = 'publish'", $speaker_id
 		));
 
 		if ( empty( $proposals ) ) :

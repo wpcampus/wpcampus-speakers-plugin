@@ -58,6 +58,8 @@ class WPCampus_Speakers {
 
 		// Filter queries.
 		add_filter( 'query_vars', array( $plugin, 'filter_query_vars' ) );
+		add_filter( 'posts_clauses', array( $plugin, 'filter_posts_clauses' ), 100, 2 );
+
 		// Register our post types.
 		add_action( 'init', array( $plugin, 'register_custom_post_types_taxonomies' ) );
 
@@ -155,6 +157,42 @@ class WPCampus_Speakers {
 		$query_vars[] = 'proposal_status';
 		return $query_vars;
 	}
+
+	/**
+	 * Filter queries.
+	 */
+	public function filter_posts_clauses( $pieces, $query ) {
+		global $wpdb;
+
+		$post_type = $query->get( 'post_type' );
+
+		switch ( $post_type ) {
+
+			case 'proposal':
+
+				// Only if we're querying by the status.
+				if ( isset( $query->query_vars['proposal_status'] ) ) {
+
+					$proposal_status = $query->get( 'proposal_status' );
+
+					// "Join" to get proposal status.
+					$pieces['join'] .= " LEFT JOIN {$wpdb->postmeta} proposal_status ON proposal_status.post_id = {$wpdb->posts}.ID AND proposal_status.meta_key = 'proposal_status'";
+
+					if ( empty( $proposal_status ) ) {
+						$pieces['where'] .= ' AND proposal_status.post_id IS NULL';
+					} else {
+						$pieces['where'] .= $wpdb->prepare( ' AND proposal_status.meta_value = %s', strtolower( $proposal_status ) );
+					}
+				}
+
+				break;
+
+		}
+
+		return $pieces;
+	}
+
+	/**
 	 * Registers all of our custom
 	 * post types and taxonomies.
 	 */

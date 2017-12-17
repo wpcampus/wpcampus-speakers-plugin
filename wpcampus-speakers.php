@@ -53,6 +53,8 @@ class WPCampus_Speakers {
 
 		// Filters the REST query for the speaker post types.
 		add_filter( 'rest_profile_query', array( $plugin, 'filter_profile_rest_query' ), 10, 2 );
+		add_filter( 'rest_proposal_query', array( $plugin, 'filter_proposal_rest_query' ), 10, 2 );
+
 		// Register our post types.
 		add_action( 'init', array( $plugin, 'register_custom_post_types_taxonomies' ) );
 
@@ -119,6 +121,25 @@ class WPCampus_Speakers {
 	 */
 	public function filter_profile_rest_query( $args, $request ) {
 		$args['post_status'] = 'publish';
+		return $args;
+	}
+
+	/**
+	 * Make sure proposals only show up
+	 * if they are selected or confirmed.
+	 */
+	public function filter_proposal_rest_query( $args, $request ) {
+
+		$args['post_status'] = 'publish';
+
+		$args['meta_query'] = array(
+			array(
+				'key'     => 'proposal_status',
+				'value'   => array( 'selected', 'confirmed' ),
+				'compare' => 'IN',
+			),
+		);
+
 		return $args;
 	}
 

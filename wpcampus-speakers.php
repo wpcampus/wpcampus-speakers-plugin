@@ -155,6 +155,7 @@ class WPCampus_Speakers {
 	 */
 	public function filter_query_vars( $query_vars ) {
 		$query_vars[] = 'profile_user';
+		$query_vars[] = 'proposal_speaker';
 		$query_vars[] = 'proposal_status';
 		return $query_vars;
 	}
@@ -184,6 +185,17 @@ class WPCampus_Speakers {
 				break;
 
 			case 'proposal':
+
+				// Only if we're querying by the speaker.
+				if ( ! empty( $query->query_vars['proposal_speaker'] ) ) {
+
+					$proposal_speaker = $query->get( 'proposal_speaker' );
+
+					// "Join" to get proposal status.
+					$pieces['join'] .= " LEFT JOIN {$wpdb->postmeta} proposal_speaker ON proposal_speaker.post_id = {$wpdb->posts}.ID AND proposal_speaker.meta_key REGEXP '^speakers\_([0-9]+)\_speaker$'";
+					$pieces['where'] .= $wpdb->prepare( ' AND proposal_speaker.meta_value = %s', $proposal_speaker );
+
+				}
 
 				// Only if we're querying by the status.
 				if ( ! empty( $query->query_vars['proposal_status'] ) ) {

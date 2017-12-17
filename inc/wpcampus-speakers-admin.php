@@ -364,36 +364,6 @@ class WPCampus_Speakers_Admin {
 	}
 
 	/**
-	 * Print list of proposal speaker(s).
-	 */
-	public function print_proposal_speaker_list( $proposal_id ) {
-		if ( function_exists( 'have_rows' ) && have_rows( 'speakers', $proposal_id ) ) :
-			$speaker_count = 0;
-			while ( have_rows( 'speakers', $proposal_id ) ) :
-				the_row();
-
-				$speaker_id = get_sub_field( 'speaker' );
-				if ( $speaker_id > 0 ) :
-
-					$speaker_display_name = get_post_meta( $speaker_id, 'display_name', true );
-					if ( ! empty( $speaker_display_name ) ) :
-
-						// Setup the filter URL.
-						$filters = $_GET;
-						$filters['proposal_speaker'] = $speaker_id;
-						$filter_url = add_query_arg( $filters, 'edit.php' );
-
-						echo $speaker_count > 0 ? '<br />' : null;
-						?><a href="<?php echo $filter_url; ?>"><?php echo $speaker_display_name; ?></a> (<a href="<?php echo get_edit_post_link( $speaker_id ); ?>"><?php _e( 'Edit', 'wpcampus' ); ?></a>)<?php
-
-					endif;
-				endif;
-				$speaker_count++;
-			endwhile;
-		endif;
-	}
-
-	/**
 	 * Print the label for a proposal status.
 	 */
 	public function print_proposal_status_label( $status ) {

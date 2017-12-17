@@ -51,6 +51,8 @@ class WPCampus_Speakers {
 		// Restrict access to our API routes.
 		add_filter( 'rest_authentication_errors', array( $plugin, 'restrict_api_access' ) );
 
+		// Filters the REST query for the speaker post types.
+		add_filter( 'rest_profile_query', array( $plugin, 'filter_profile_rest_query' ), 10, 2 );
 		// Register our post types.
 		add_action( 'init', array( $plugin, 'register_custom_post_types_taxonomies' ) );
 
@@ -108,6 +110,16 @@ class WPCampus_Speakers {
 		}
 
 		return $result;
+	}
+
+	/**
+	 * @TODO: Make sure profiles only show up
+	 * if they are assigned to a selected
+	 * or confirmed proposal.
+	 */
+	public function filter_profile_rest_query( $args, $request ) {
+		$args['post_status'] = 'publish';
+		return $args;
 	}
 
 	/**

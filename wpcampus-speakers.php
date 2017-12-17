@@ -171,15 +171,15 @@ class WPCampus_Speakers {
 			case 'proposal':
 
 				// Only if we're querying by the status.
-				if ( isset( $query->query_vars['proposal_status'] ) ) {
+				if ( ! empty( $query->query_vars['proposal_status'] ) ) {
 
 					$proposal_status = $query->get( 'proposal_status' );
 
 					// "Join" to get proposal status.
 					$pieces['join'] .= " LEFT JOIN {$wpdb->postmeta} proposal_status ON proposal_status.post_id = {$wpdb->posts}.ID AND proposal_status.meta_key = 'proposal_status'";
 
-					if ( empty( $proposal_status ) ) {
-						$pieces['where'] .= ' AND proposal_status.post_id IS NULL';
+					if ( 'submitted' == $proposal_status || empty( $proposal_status ) ) {
+						$pieces['where'] .= " AND ( proposal_status.post_id IS NULL OR proposal_status.meta_value = 'submitted' )";
 					} else {
 						$pieces['where'] .= $wpdb->prepare( ' AND proposal_status.meta_value = %s', strtolower( $proposal_status ) );
 					}

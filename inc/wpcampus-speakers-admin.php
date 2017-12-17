@@ -352,7 +352,33 @@ class WPCampus_Speakers_Admin {
 						endif;
 
 						?></td>
-						<td><?php $this->print_proposal_speaker_list( $proposal->ID ); ?></td>
+						<td><?php
+
+						if ( function_exists( 'have_rows' ) && have_rows( 'speakers', $proposal->ID ) ) :
+							$speaker_count = 0;
+							while ( have_rows( 'speakers', $proposal->ID ) ) :
+								the_row();
+
+								$this_speaker_id = get_sub_field( 'speaker' );
+								if ( $this_speaker_id > 0 ) :
+
+									$speaker_display_name = get_post_meta( $this_speaker_id, 'display_name', true );
+									if ( ! empty( $speaker_display_name ) ) :
+
+										echo $speaker_count > 0 ? '<br />' : null;
+
+										if ( $this_speaker_id != $speaker_id ) :
+											?><a href="<?php echo get_edit_post_link( $this_speaker_id ); ?>"><?php echo $speaker_display_name; ?></a><?php
+										else :
+											echo $speaker_display_name;
+										endif;
+									endif;
+								endif;
+								$speaker_count++;
+							endwhile;
+						endif;
+
+						?></td>
 					</tr>
 					<?php
 				endforeach;

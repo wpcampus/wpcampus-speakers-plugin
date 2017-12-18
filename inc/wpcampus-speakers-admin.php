@@ -160,9 +160,10 @@ class WPCampus_Speakers_Admin {
 		), true );
 
 		return $this->add_admin_columns( $columns, array(
-			'profile_name'  => __( 'Speaker', 'wpcampus' ),
-			'profile_user'  => __( 'User', 'wpcampus' ),
-			'profile_email' => __( 'Email', 'wpcampus' ),
+			'profile_name'      => __( 'Speaker', 'wpcampus' ),
+			'profile_user'      => __( 'User', 'wpcampus' ),
+			'profile_email'     => __( 'Email', 'wpcampus' ),
+			'profile_proposals' => __( 'Proposals', 'wpcampus' ),
 		));
 	}
 
@@ -180,6 +181,7 @@ class WPCampus_Speakers_Admin {
 	 * Populate our custom profile columns.
 	 */
 	public function populate_profile_columns( $column, $post_id ) {
+		global $wpdb;
 
 		switch ( $column ) {
 
@@ -217,6 +219,27 @@ class WPCampus_Speakers_Admin {
 				$email = get_post_meta( $post_id, 'email', true );
 				if ( ! empty( $email ) ) :
 					?><a href="mailto:<?php echo $email; ?>"><?php echo $email; ?></a><?php
+				endif;
+				break;
+
+			case 'profile_proposals':
+
+				// Get number of proposals where speaker is attached.
+				$proposals_count = $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$wpdb->posts} proposals
+					INNER JOIN {$wpdb->postmeta} meta ON meta.post_id = proposals.ID AND meta.meta_key REGEXP '^speakers\_([0-9]+)\_speaker$' AND meta.meta_value = %s
+					WHERE proposals.post_type = 'proposal' AND proposals.post_status = 'publish'", $post_id ));
+
+				if ( ! $proposals_count ) :
+					echo '-';
+				else :
+
+					$filter_url = add_query_arg( array(
+						'post_type'         => 'proposal',
+						'proposal_speaker'  => 17188,
+					), admin_url( 'edit.php' ) );
+
+					?><a href="<?php echo $filter_url; ?>"><?php printf( _n( '%s proposal', '%s proposals', $proposals_count, 'wpcampus' ), $proposals_count ); ?></a><?php
+
 				endif;
 				break;
 		}

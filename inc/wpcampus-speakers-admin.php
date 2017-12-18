@@ -41,6 +41,9 @@ class WPCampus_Speakers_Admin {
 		add_action( 'add_meta_boxes', array( $plugin, 'add_meta_boxes' ), 1, 2 );
 		add_action( 'admin_menu', array( $plugin, 'remove_meta_boxes' ) );
 
+		// Add instructions to thumbnail admin meta box.
+		add_filter( 'admin_post_thumbnail_html', array( $plugin, 'filter_admin_post_thumbnail_html' ), 100, 2 );
+
 	}
 
 	/**
@@ -503,6 +506,19 @@ class WPCampus_Speakers_Admin {
 				?><em><?php _e( 'Submitted', 'wpcampus' ); ?></em><?php
 				break;
 		}
+	}
+
+	/**
+	 * Adds instructions to the admin thumbnail meta box.
+	 */
+	public function filter_admin_post_thumbnail_html( $content, $post_id ) {
+
+		// Show instructions for speaker photo.
+		if ( 'profile' == get_post_type( $post_id ) ) {
+			$content .= '<div class="wp-ui-highlight" style="padding:10px;margin:15px 0 5px 0;">' . __( "Please load the speaker's photo as a featured image. The image needs to be at least 200px wide.", 'wpcampus' ) . '</div>';
+		}
+
+		return $content;
 	}
 }
 WPCampus_Speakers_Admin::register();

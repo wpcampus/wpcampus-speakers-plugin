@@ -57,6 +57,8 @@ class WPCampus_Speakers {
 		add_filter( 'rest_profile_query', array( $plugin, 'filter_profile_rest_query' ), 10, 2 );
 		add_filter( 'rest_proposal_query', array( $plugin, 'filter_proposal_rest_query' ), 10, 2 );
 
+		// Filters the post data for a response for the speaker post types.
+		add_filter( 'rest_prepare_proposal', array( $plugin, 'prepare_proposal_rest_response' ), 10, 2 );
 
 		// Filter queries.
 		add_filter( 'query_vars', array( $plugin, 'filter_query_vars' ) );
@@ -151,6 +153,68 @@ class WPCampus_Speakers {
 	}
 
 	/**
+	 * Prepare REST response for proposals.
+	 */
+	public function prepare_proposal_rest_response( $response, $post ) {
+
+		// We only want to keep specific data.
+		$keys_to_keep = array( 'id', 'status', 'type', 'link', 'title', 'content', 'excerpt', 'featured_media', 'session_type' );
+		foreach ( $response->data as $key => $value ) {
+			if ( ! in_array( $key, $keys_to_keep ) ) {
+				unset( $response->data[ $key ] );
+			}
+		}
+
+		// Add custom data.
+		$response->data['proposal_status'] = strtolower( preg_replace( '/([^a-z])/i', '', get_post_meta( $post->ID, 'proposal_status', true ) ) );
+
+		// Get speaker(s) data.
+		$response->data['speakers'] = array();
+
+		if ( function_exists( 'have_rows' ) && have_rows( 'speakers', $post->ID ) ) {
+			while ( have_rows( 'speakers', $post->ID ) ) {
+				the_row();
+
+				$speaker_id = intval( get_sub_field( 'speaker' ) );
+				if ( $speaker_id > 0 ) {
+					$response->data['speakers'][] = array(
+						'ID' => $speaker_id,
+						'display_name' => strip_tags( get_post_meta( $speaker_id, 'display_name', true ) ),
+						'twitter' => strip_tags( get_post_meta( $speaker_id, 'twitter', true ) ),
+						'href' => rest_url( 'wp/v2/profile/' . $speaker_id ),
+					);
+				}
+			}
+		}
+
+		// Get event(s).
+		$response->data['events'] = array();
+		$events = wp_get_object_terms( $post->ID, 'event' );
+		if ( ! empty( $events ) ) {
+			foreach ( $events as $event ) {
+				$response->data['events'][] = array(
+					'ID'    => $event->term_id,
+					'slug'  => $event->slug,
+					'name'  => $event->name,
+				);
+			}
+		}
+
+		// Get subjects.
+		$response->data['subjects'] = array();
+		$subjects = wp_get_object_terms( $post->ID, 'subjects' );
+		if ( ! empty( $subjects ) ) {
+			foreach ( $subjects as $subject ) {
+				$response->data['subjects'][] = array(
+					'ID'    => $subject->term_id,
+					'slug'  => $subject->slug,
+					'name'  => $subject->name,
+				);
+			}
+		}
+
+		return $response;
+	}
 
 	/**
 	 * Add query vars to the whitelist.

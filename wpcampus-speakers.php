@@ -136,18 +136,13 @@ class WPCampus_Speakers {
 	/**
 	 * Make sure proposals only show up
 	 * if they are selected or confirmed.
+	 *
+	 * NOTE: Don't set default proposal status here.
+	 * We do that in the post clauses filter.
 	 */
 	public function filter_proposal_rest_query( $args, $request ) {
 
 		$args['post_status'] = 'publish';
-
-		$args['meta_query'] = array(
-			array(
-				'key'     => 'proposal_status',
-				'value'   => array( 'selected', 'confirmed' ),
-				'compare' => 'IN',
-			),
-		);
 
 		return $args;
 	}
@@ -263,24 +258,38 @@ class WPCampus_Speakers {
 
 				}
 
-				// Only if we're querying by the status.
+				// Query against proposal status.
+				$proposal_status = null;
+
 				if ( ! empty( $query->query_vars['proposal_status'] ) ) {
-
 					$proposal_status = $query->get( 'proposal_status' );
+				} elseif ( ! empty( $_GET['proposal_status'] ) ) {
+					$proposal_status = $_GET['proposal_status'];
+				}
 
-					// "Join" to get proposal status.
-					$pieces['join'] .= " LEFT JOIN {$wpdb->postmeta} proposal_status ON proposal_status.post_id = {$wpdb->posts}.ID AND proposal_status.meta_key = 'proposal_status'";
+				// By default, only get confirmed proposals.
+				if ( empty( $proposal_status ) ) {
+					$proposal_status = array( 'confirmed' );
+				} else {
 
-					// If looking for simply submitted proposals, could be blank.
-					if ( 'submitted' == $proposal_status ) {
-						$pieces['where'] .= " AND ( proposal_status.post_id IS NULL OR proposal_status.meta_value = 'submitted' )";
-					} else {
-						$pieces['where'] .= $wpdb->prepare( ' AND proposal_status.meta_value = %s', strtolower( $proposal_status ) );
+					// Clean up query.
+					if ( ! is_array( $proposal_status ) ) {
+						$proposal_status = explode( ',', str_replace( ' ', '', $proposal_status ) );
+						$proposal_status = array_map( 'strtolower', $proposal_status );
 					}
 				}
 
-				break;
+				// "Join" to get proposal status.
+				$pieces['join'] .= " LEFT JOIN {$wpdb->postmeta} proposal_status ON proposal_status.post_id = {$wpdb->posts}.ID AND proposal_status.meta_key = 'proposal_status'";
 
+				// If looking for submitted proposals, could be blank.
+				if ( in_array( 'submitted', $proposal_status ) ) {
+					$pieces['where'] .= " AND ( proposal_status.post_id IS NULL OR proposal_status.meta_value IN ('" . implode( "','", $proposal_status ) . "') )";
+				} else {
+					$pieces['where'] .= " AND proposal_status.meta_value IN ('" . implode( "','", $proposal_status ) . "')";
+				}
+
+				break;
 		}
 
 		return $pieces;

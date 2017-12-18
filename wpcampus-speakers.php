@@ -257,6 +257,7 @@ class WPCampus_Speakers {
 			'public'                => false,
 			'show_ui'               => true,
 			'show_in_menu'          => 'wpc-speakers',
+			'menu_icon'             => 'dashicons-format-aside',
 			'show_in_admin_bar'     => true,
 			'show_in_nav_menus'     => false,
 			'can_export'            => true,
@@ -264,6 +265,7 @@ class WPCampus_Speakers {
 			'exclude_from_search'   => true,
 			'publicly_queryable'    => false,
 			'capability_type'       => array( 'proposal', 'proposals' ),
+			'rewrite'               => false,
 			'show_in_rest'          => true,
 		));
 
@@ -295,6 +297,7 @@ class WPCampus_Speakers {
 			'public'                => false,
 			'show_ui'               => true,
 			'show_in_menu'          => 'wpc-speakers',
+			'menu_icon'             => 'dashicons-admin-users',
 			'show_in_admin_bar'     => true,
 			'show_in_nav_menus'     => false,
 			'can_export'            => true,
@@ -302,6 +305,7 @@ class WPCampus_Speakers {
 			'exclude_from_search'   => true,
 			'publicly_queryable'    => false,
 			'capability_type'       => array( 'profile', 'profiles' ),
+			'rewrite'               => false,
 			'show_in_rest'          => true,
 		));
 

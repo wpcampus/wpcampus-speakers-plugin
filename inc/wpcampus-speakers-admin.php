@@ -34,8 +34,9 @@ class WPCampus_Speakers_Admin {
 		// Adds dropdown to filter the speaker status.
 		add_action( 'restrict_manage_posts', array( $plugin, 'add_proposal_filters' ), 100 );
 
-		// Add meta boxes.
+		// Add/remove meta boxes.
 		add_action( 'add_meta_boxes', array( $plugin, 'add_meta_boxes' ), 1, 2 );
+		add_action( 'admin_menu', array( $plugin, 'remove_meta_boxes' ) );
 
 	}
 
@@ -266,6 +267,16 @@ class WPCampus_Speakers_Admin {
 				);
 				break;
 		}
+	}
+
+	/**
+	 * Remove meta boxes.
+	 */
+	public function remove_meta_boxes() {
+
+		// We use ACF to manage events.
+		remove_meta_box( 'tagsdiv-event', 'proposal', 'side' );
+
 	}
 
 	/**

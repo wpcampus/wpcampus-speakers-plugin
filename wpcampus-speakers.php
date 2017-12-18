@@ -328,7 +328,7 @@ class WPCampus_Speakers {
 			),
 			'hierarchical'      => false,
 			'public'            => false,
-			'show_ui'           => false,
+			'show_ui'           => true,
 			'show_admin_column' => true,
 			'show_in_nav_menus' => false,
 			'show_tagcloud'     => false,

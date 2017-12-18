@@ -83,24 +83,34 @@ class WPCampus_Speakers_Admin {
 	public function print_speakers_main_page() {}
 
 	/**
-	 * Used in admin to add custom
-	 * columns after the title.
+	 * Used in admin to add custom columns.
+	 *
+	 * If $before is true, will add columns
+	 * before the title. Otherwise, will add
+	 * after the title.
 	 */
-	public function add_columns_after_title( $columns, $add_after_title ) {
+	public function add_admin_columns( $columns, $columns_to_add, $before = false ) {
 
 		// Store new columns.
 		$new_columns = array();
 
 		foreach ( $columns as $key => $value ) {
 
-			// Add to new columns.
-			$new_columns[ $key ] = $value;
+			// Add new columns after the title.
+			if ( ! $before ) {
+				$new_columns[ $key ] = $value;
+			}
 
 			// Add custom columns after title.
 			if ( 'title' == $key ) {
-				foreach ( $add_after_title as $column_key => $column_value ) {
+				foreach ( $columns_to_add as $column_key => $column_value ) {
 					$new_columns[ $column_key ] = $column_value;
 				}
+			}
+
+			// Add new columns before the title.
+			if ( $before ) {
+				$new_columns[ $key ] = $value;
 			}
 		}
 
@@ -111,7 +121,7 @@ class WPCampus_Speakers_Admin {
 	 * Add custom admin columns for profiles.
 	 */
 	public function add_profile_columns( $columns ) {
-		return $this->add_columns_after_title( $columns, array(
+		return $this->add_admin_columns( $columns, array(
 			'profile_name'  => __( 'Speaker', 'wpcampus' ),
 			'profile_user'  => __( 'User', 'wpcampus' ),
 			'profile_email' => __( 'Email', 'wpcampus' ),
@@ -122,7 +132,7 @@ class WPCampus_Speakers_Admin {
 	 * Add custom admin columns for proposals.
 	 */
 	public function add_proposal_columns( $columns ) {
-		return $this->add_columns_after_title( $columns, array(
+		return $this->add_admin_columns( $columns, array(
 			'proposal_status'   => __( 'Status', 'wpcampus' ),
 			'proposal_speaker'  => __( 'Speaker(s)', 'wpcampus' ),
 		));

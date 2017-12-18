@@ -84,6 +84,7 @@ class WPCampus_Speakers_Admin {
 
 		// Add taxonomy pages under speakers.
 		add_submenu_page( 'wpc-speakers', __( 'Events', 'wpcampus' ), __( 'Events', 'wpcampus' ), 'manage_categories', 'edit-tags.php?taxonomy=event&section=wpc-speakers' );
+		add_submenu_page( 'wpc-speakers', __( 'Session Types', 'wpcampus' ), __( 'Session Types', 'wpcampus' ), 'manage_categories', 'edit-tags.php?taxonomy=session_type&section=wpc-speakers' );
 		add_submenu_page( 'wpc-speakers', __( 'Subjects', 'wpcampus' ), __( 'Subjects', 'wpcampus' ), 'manage_categories', 'edit-tags.php?taxonomy=subjects&section=wpc-speakers' );
 
 	}
@@ -101,7 +102,7 @@ class WPCampus_Speakers_Admin {
 		$current_screen = get_current_screen();
 
 		// Show taxonomies under "Speakers" menu.
-		if ( ! empty( $current_screen->taxonomy ) && in_array( $current_screen->taxonomy, array( 'event', 'subjects' ) ) ) {
+		if ( ! empty( $current_screen->taxonomy ) && in_array( $current_screen->taxonomy, array( 'event', 'session_type', 'subjects' ) ) ) {
 			if ( isset( $_GET['section'] ) && 'wpc-speakers' == $_GET['section'] ) {
 				return $_GET['section'];
 			}

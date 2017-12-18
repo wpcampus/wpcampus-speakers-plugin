@@ -334,6 +334,36 @@ class WPCampus_Speakers {
 			'show_tagcloud'     => false,
 			'show_in_rest'      => true,
 		));
+
+		register_taxonomy( 'session_type', array( 'proposal' ), array(
+			'labels' => array(
+				'name'                          => _x( 'Session Types', 'Taxonomy General Name', 'wpcampus' ),
+				'singular_name'                 => _x( 'Session Type', 'Taxonomy Singular Name', 'wpcampus' ),
+				'menu_name'                     => __( 'Session Types', 'wpcampus' ),
+				'all_items'                     => __( 'All Session Types', 'wpcampus' ),
+				'new_item_name'                 => __( 'New Session Type', 'wpcampus' ),
+				'add_new_item'                  => __( 'Add New Session Type', 'wpcampus' ),
+				'edit_item'                     => __( 'Edit Session Type', 'wpcampus' ),
+				'update_item'                   => __( 'Update Session Type', 'wpcampus' ),
+				'view_item'                     => __( 'View Session Type', 'wpcampus' ),
+				'separate_items_with_commas'    => __( 'Separate session types with commas', 'wpcampus' ),
+				'add_or_remove_items'           => __( 'Add or remove session types', 'wpcampus' ),
+				'choose_from_most_used'         => __( 'Choose from the most used session types', 'wpcampus' ),
+				'popular_items'                 => __( 'Popular session types', 'wpcampus' ),
+				'search_items'                  => __( 'Search Session Types', 'wpcampus' ),
+				'not_found'                     => __( 'No session types found.', 'wpcampus' ),
+				'no_terms'                      => __( 'No session types', 'wpcampus' ),
+				'items_list'                    => __( 'Session types list', 'wpcampus' ),
+				'items_list_navigation'         => __( 'Session types list navigation', 'wpcampus' ),
+			),
+			'hierarchical'      => false,
+			'public'            => false,
+			'show_ui'           => true,
+			'show_admin_column' => true,
+			'show_in_nav_menus' => false,
+			'show_tagcloud'     => false,
+			'show_in_rest'      => true,
+		));
 	}
 }
 WPCampus_Speakers::register();

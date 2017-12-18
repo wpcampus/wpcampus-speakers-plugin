@@ -239,7 +239,7 @@ class WPCampus_Speakers_Admin {
 
 					$filter_url = add_query_arg( array(
 						'post_type'         => 'proposal',
-						'proposal_speaker'  => 17188,
+						'proposal_speaker'  => $post_id,
 					), admin_url( 'edit.php' ) );
 
 					?><a href="<?php echo $filter_url; ?>"><?php printf( _n( '%s proposal', '%s proposals', $proposals_count, 'wpcampus' ), $proposals_count ); ?></a><?php

@@ -21,6 +21,9 @@ class WPCampus_Speakers_Admin {
 	public static function register() {
 		$plugin = new self();
 
+		// Print styles in the admin <head>.
+		add_action( 'admin_print_styles-edit.php', array( $plugin, 'print_styles' ) );
+
 		// Add items to the admin menu.
 		add_action( 'admin_menu', array( $plugin, 'add_menu_pages' ) );
 		add_action( 'parent_file', array( $plugin, 'filter_submenu_parent' ) );
@@ -38,6 +41,36 @@ class WPCampus_Speakers_Admin {
 		add_action( 'add_meta_boxes', array( $plugin, 'add_meta_boxes' ), 1, 2 );
 		add_action( 'admin_menu', array( $plugin, 'remove_meta_boxes' ) );
 
+	}
+
+	/**
+	 * Print custom styles in the admin <head>.
+	 */
+	public function print_styles() {
+		global $post_type;
+		switch ( $post_type ) {
+
+			case 'profile':
+				?>
+				<style type="text/css">
+					.wp-list-table .column-profile_thumb {
+						width: 55px;
+					}
+					.wp-list-table img.wpc-profile-thumb {
+						width: 55px;
+						height: auto;
+						margin: 0;
+						border: 0;
+					}
+					.wp-list-table .wpc-profile-thumb-default {
+						background: #2e3641;
+						width: 55px;
+						height: 55px;
+					}
+				</style>
+				<?php
+				break;
+		}
 	}
 
 	/**
@@ -121,6 +154,11 @@ class WPCampus_Speakers_Admin {
 	 * Add custom admin columns for profiles.
 	 */
 	public function add_profile_columns( $columns ) {
+
+		$columns = $this->add_admin_columns( $columns, array(
+			'profile_thumb' => __( 'Image', 'wpcampus' ),
+		), true );
+
 		return $this->add_admin_columns( $columns, array(
 			'profile_name'  => __( 'Speaker', 'wpcampus' ),
 			'profile_user'  => __( 'User', 'wpcampus' ),
@@ -145,13 +183,23 @@ class WPCampus_Speakers_Admin {
 
 		switch ( $column ) {
 
+			case 'profile_thumb':
+				$headshot = get_the_post_thumbnail_url( $post_id, 'thumbnail' );
+				if ( ! empty( $headshot ) ) :
+					$display_name = strip_tags( get_post_meta( $post_id, 'display_name', true ) );
+					?><img class="wpc-profile-thumb" src="<?php echo $headshot; ?>" alt="<?php printf( esc_attr__( 'Headshot for %s', 'wpcampus' ), $display_name ); ?>" /><?php
+				else :
+					?><div class="wpc-profile-thumb-default"></div><?php
+				endif;
+				break;
+
 			case 'profile_name':
 				echo get_post_meta( $post_id, 'display_name', true );
 				break;
 
 			case 'profile_user':
 				$profile_user_id = get_post_meta( $post_id, 'wordpress_user', true );
-				if ( $profile_user_id > 0 ) {
+				if ( $profile_user_id > 0 ) :
 					$user = get_userdata( $profile_user_id );
 					if ( false !== $user ) :
 
@@ -162,7 +210,7 @@ class WPCampus_Speakers_Admin {
 
 						?><a href="<?php echo $filter_url; ?>"><?php echo $user->display_name; ?></a><?php
 					endif;
-				}
+				endif;
 				break;
 
 			case 'profile_email':

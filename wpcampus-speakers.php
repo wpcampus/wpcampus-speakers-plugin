@@ -129,7 +129,10 @@ class WPCampus_Speakers {
 	 * or confirmed proposal.
 	 */
 	public function filter_profile_rest_query( $args, $request ) {
+
 		$args['post_status'] = 'publish';
+		$args['posts_per_page'] = 100;
+
 		return $args;
 	}
 
@@ -143,6 +146,7 @@ class WPCampus_Speakers {
 	public function filter_proposal_rest_query( $args, $request ) {
 
 		$args['post_status'] = 'publish';
+		$args['posts_per_page'] = 100;
 
 		return $args;
 	}

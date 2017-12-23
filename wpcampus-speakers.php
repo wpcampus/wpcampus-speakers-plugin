@@ -157,7 +157,7 @@ class WPCampus_Speakers {
 	public function prepare_proposal_rest_response( $response, $post ) {
 
 		// We only want to keep specific data.
-		$keys_to_keep = array( 'id', 'status', 'type', 'link', 'title', 'content', 'excerpt', 'featured_media', 'session_type' );
+		$keys_to_keep = array( 'id', 'status', 'type', 'slug', 'link', 'title', 'content', 'excerpt', 'featured_media', 'session_type' );
 		foreach ( $response->data as $key => $value ) {
 			if ( ! in_array( $key, $keys_to_keep ) ) {
 				unset( $response->data[ $key ] );

@@ -132,6 +132,7 @@ class WPCampus_Speakers {
 
 		$args['post_status'] = 'publish';
 		$args['posts_per_page'] = 100;
+		$args['ignore_sticky_posts'] = true;
 
 		return $args;
 	}
@@ -147,6 +148,7 @@ class WPCampus_Speakers {
 
 		$args['post_status'] = 'publish';
 		$args['posts_per_page'] = 100;
+		$args['ignore_sticky_posts'] = true;
 
 		return $args;
 	}

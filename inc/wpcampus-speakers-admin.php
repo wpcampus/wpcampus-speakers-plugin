@@ -192,7 +192,7 @@ class WPCampus_Speakers_Admin {
 			case 'profile_thumb':
 				$headshot = get_the_post_thumbnail_url( $post_id, 'thumbnail' );
 				if ( ! empty( $headshot ) ) :
-					$display_name = strip_tags( get_post_meta( $post_id, 'display_name', true ) );
+					$display_name = sanitize_text_field( get_post_meta( $post_id, 'display_name', true ) );
 					?><img class="wpc-profile-thumb" src="<?php echo $headshot; ?>" alt="<?php printf( esc_attr__( 'Headshot for %s', 'wpcampus' ), $display_name ); ?>" /><?php
 				else :
 					?><div class="wpc-profile-thumb-default"></div><?php

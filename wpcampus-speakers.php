@@ -237,7 +237,8 @@ class WPCampus_Speakers {
 		}
 
 		// Add custom data.
-		$response->data['proposal_status'] = strtolower( preg_replace( '/([^a-z])/i', '', get_post_meta( $post->ID, 'proposal_status', true ) ) );
+		$proposal_status = preg_replace( '/([^a-z])/i', '', get_post_meta( $post->ID, 'proposal_status', true ) );
+		$response->data['proposal_status'] = ! empty( $proposal_status ) ? strtolower( $proposal_status ) : null;
 
 		// Get speaker(s) data.
 		$response->data['speakers'] = array();
@@ -248,12 +249,18 @@ class WPCampus_Speakers {
 
 				$speaker_id = intval( get_sub_field( 'speaker' ) );
 				if ( $speaker_id > 0 ) {
-					$response->data['speakers'][] = array(
-						'ID' => $speaker_id,
-						'display_name' => strip_tags( get_post_meta( $speaker_id, 'display_name', true ) ),
-						'twitter' => strip_tags( get_post_meta( $speaker_id, 'twitter', true ) ),
+
+					$speaker_data = array(
+						'id' => $speaker_id,
+						'content' => array(
+							'rendered'  => wpautop( get_post_field( 'post_content', $speaker_id ) ),
+						),
 						'href' => rest_url( 'wp/v2/profile/' . $speaker_id ),
 					);
+
+					// Add to list of speakers.
+					$response->data['speakers'][] = $this->prepare_speaker_rest_response( $speaker_data, $speaker_id );
+
 				}
 			}
 		}

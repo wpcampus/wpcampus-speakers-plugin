@@ -202,7 +202,7 @@ class WPCampus_Speakers {
 		if ( ! empty( $events ) ) {
 			foreach ( $events as $event ) {
 				$response->data['events'][] = array(
-					'ID'    => $event->term_id,
+					'id'    => $event->term_id,
 					'slug'  => $event->slug,
 					'name'  => $event->name,
 				);
@@ -215,7 +215,7 @@ class WPCampus_Speakers {
 		if ( ! empty( $subjects ) ) {
 			foreach ( $subjects as $subject ) {
 				$response->data['subjects'][] = array(
-					'ID'    => $subject->term_id,
+					'id'    => $subject->term_id,
 					'slug'  => $subject->slug,
 					'name'  => $subject->name,
 				);

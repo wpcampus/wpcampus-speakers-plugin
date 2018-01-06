@@ -14,6 +14,14 @@
  * @package         WPCampus Speakers
  */
 
+/**
+ * @TODO:
+ * - Setup confirmation form in new setup (move from sessions plugin).
+ * - Remove the dropdown selection status filter from the session plugin.
+ * - Move "WPCampus Speaker Information" meta box in sessions plugin to live elsewhere?
+ * - Move "Technical Levels" to proposal?
+ */
+
 // If this file is called directly, abort.
 if ( ! defined( 'WPINC' ) ) {
 	die;

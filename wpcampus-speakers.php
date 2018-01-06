@@ -66,6 +66,7 @@ class WPCampus_Speakers {
 		add_filter( 'rest_proposal_query', array( $plugin, 'filter_proposal_rest_query' ), 10, 2 );
 
 		// Filters the post data for a response for the speaker post types.
+		add_filter( 'rest_prepare_profile', array( $plugin, 'prepare_profile_rest_response' ), 10, 2 );
 		add_filter( 'rest_prepare_proposal', array( $plugin, 'prepare_proposal_rest_response' ), 10, 2 );
 
 		// Filter queries.
@@ -204,6 +205,25 @@ class WPCampus_Speakers {
 	}
 
 	/**
+	 * Prepare REST response for profiles.
+	 */
+	public function prepare_profile_rest_response( $response, $post ) {
+
+		// We only want to keep specific data.
+		$keys_to_keep = array( 'id', 'status', 'type', 'slug', 'link', 'content', 'excerpt', 'featured_media' );
+		foreach ( $response->data as $key => $value ) {
+			if ( ! in_array( $key, $keys_to_keep ) ) {
+				unset( $response->data[ $key ] );
+			}
+		}
+
+		// Add speaker data.
+		$response = $this->prepare_speaker_rest_response( $response->data, $post->ID );
+
+		return $response;
+	}
+
+	/**
 	 * Prepare REST response for proposals.
 	 */
 	public function prepare_proposal_rest_response( $response, $post ) {
@@ -263,6 +283,69 @@ class WPCampus_Speakers {
 				);
 			}
 		}
+
+		return $response;
+	}
+
+	/**
+	 * Add speaker data to a REST response.
+	 */
+	public function prepare_speaker_rest_response( $response, $speaker_id ) {
+		global $wpdb;
+
+		// Run a query to get all the meta data.
+		$meta_fields = array( 'first_name', 'last_name', 'company', 'company_position', 'company_website', 'website', 'facebook', 'twitter', 'instagram', 'linkedin' );
+		$profile_fields = $wpdb->get_results( $wpdb->prepare( "SELECT meta_key, meta_value FROM {$wpdb->postmeta} WHERE post_id = %s AND meta_key IN ('" . implode( "','", $meta_fields ) . "')", $speaker_id ) );
+
+		// Build display name.
+		$display_name = sanitize_text_field( get_post_meta( $speaker_id, 'display_name', true ) );
+
+		// Add display name.
+		$response['display_name'] = ! empty( $display_name ) ? $display_name : null;
+
+		// If not defined, use first and last name.
+		if ( ! $display_name ) {
+			$first_name = '';
+			$last_name = '';
+			$have_first_name = false;
+			$have_last_name = false;
+			foreach ( $profile_fields as $meta ) {
+				if ( $have_first_name && $have_last_name ) {
+					break;
+				}
+				if ( 'first_name' == $meta->meta_key ) {
+					$first_name = $meta->meta_value;
+					$have_first_name = true;
+				}
+				if ( 'last_name' == $meta->meta_key ) {
+					$last_name = $meta->meta_value;
+					$have_last_name = true;
+				}
+			}
+
+			// Build display name.
+			$display_name = preg_replace( '/([\s]{2,})/', ' ', "{$first_name} {$last_name}" );
+		}
+
+		// If still no display name, use post title.
+		if ( ! $display_name ) {
+			$display_name = get_post_field( 'post_title', $speaker_id );
+		}
+
+		// Add display name as title.
+		$response['title'] = array(
+			'rendered' => ! empty( $display_name ) ? $display_name : null,
+		);
+
+		// Add custom data.
+		foreach ( $profile_fields as $meta ) {
+			$meta_value = sanitize_text_field( $meta->meta_value );
+			$response[ $meta->meta_key ] = ! empty( $meta_value ) ? $meta_value : null;
+		}
+
+		// Add the headshot.
+		$headshot = get_the_post_thumbnail_url( $speaker_id, 'thumbnail' );
+		$response['headshot'] = ! empty( $headshot ) ? $headshot : null;
 
 		return $response;
 	}

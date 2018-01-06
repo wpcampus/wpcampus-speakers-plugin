@@ -132,9 +132,19 @@ class WPCampus_Speakers {
 	}
 
 	/**
-	 * @TODO: Make sure profiles only show up
-	 * if they are assigned to a selected
-	 * or confirmed proposal.
+	 * Add query vars to the whitelist.
+	 */
+	public function filter_query_vars( $query_vars ) {
+		$query_vars[] = 'profile_user';
+		$query_vars[] = 'by_proposal';
+		$query_vars[] = 'proposal_event';
+		$query_vars[] = 'proposal_speaker';
+		$query_vars[] = 'proposal_status';
+		return $query_vars;
+	}
+
+	/**
+	 * Setup the profile rest query.
 	 */
 	public function filter_profile_rest_query( $args, $request ) {
 
@@ -142,12 +152,36 @@ class WPCampus_Speakers {
 		$args['posts_per_page'] = 100;
 		$args['ignore_sticky_posts'] = true;
 
+		if ( ! empty( $_GET['by_proposal'] ) ) {
+			$args['by_proposal'] = $_GET['by_proposal'];
+
+			// Make sure it's an array.
+			if ( ! is_array( $args['by_proposal'] ) ) {
+				$args['by_proposal'] = explode( ',', str_replace( ' ', '', $args['by_proposal'] ) );
+			}
+
+			// Make sure they're IDs.
+			$args['by_proposal'] = array_filter( $args['by_proposal'], 'is_numeric' );
+
+		}
+
+		if ( ! empty( $_GET['profile_user'] ) && is_numeric( $_GET['profile_user'] ) ) {
+			$args['profile_user'] = sanitize_text_field( $_GET['profile_user'] );
+		}
+
+		if ( ! empty( $_GET['proposal_event'] ) && is_numeric( $_GET['proposal_event'] ) ) {
+			$args['proposal_event'] = sanitize_text_field( $_GET['proposal_event'] );
+		}
+
+		if ( ! empty( $_GET['proposal_status'] ) ) {
+			$args['proposal_status'] = sanitize_text_field( $_GET['proposal_status'] );
+		}
+
 		return $args;
 	}
 
 	/**
-	 * Make sure proposals only show up
-	 * if they are selected or confirmed.
+	 * Setup the proposal rest query.
 	 *
 	 * NOTE: Don't set default proposal status here.
 	 * We do that in the post clauses filter.
@@ -157,6 +191,14 @@ class WPCampus_Speakers {
 		$args['post_status'] = 'publish';
 		$args['posts_per_page'] = 100;
 		$args['ignore_sticky_posts'] = true;
+
+		if ( ! empty( $_GET['proposal_speaker'] ) && is_numeric( $_GET['proposal_speaker'] ) ) {
+			$args['proposal_speaker'] = sanitize_text_field( $_GET['proposal_speaker'] );
+		}
+
+		if ( ! empty( $_GET['proposal_status'] ) ) {
+			$args['proposal_status'] = sanitize_text_field( $_GET['proposal_status'] );
+		}
 
 		return $args;
 	}
@@ -226,16 +268,6 @@ class WPCampus_Speakers {
 	}
 
 	/**
-	 * Add query vars to the whitelist.
-	 */
-	public function filter_query_vars( $query_vars ) {
-		$query_vars[] = 'profile_user';
-		$query_vars[] = 'proposal_speaker';
-		$query_vars[] = 'proposal_status';
-		return $query_vars;
-	}
-
-	/**
 	 * Filter queries.
 	 */
 	public function filter_posts_clauses( $pieces, $query ) {
@@ -247,24 +279,112 @@ class WPCampus_Speakers {
 
 			case 'profile':
 
-				// Only if we're querying by the profile user..
-				if ( ! empty( $query->query_vars['profile_user'] ) ) {
-
-					$profile_user = $query->get( 'profile_user' );
+				// Only if we're querying by the profile user.
+				$profile_user = $query->get( 'profile_user' );
+				if ( ! empty( $profile_user ) && is_numeric( $profile_user ) ) {
 
 					// "Join" to get profile user.
 					$pieces['join'] .= " LEFT JOIN {$wpdb->postmeta} profile_user ON profile_user.post_id = {$wpdb->posts}.ID AND profile_user.meta_key = 'wordpress_user'";
 					$pieces['where'] .= $wpdb->prepare( ' AND profile_user.meta_value = %s', $profile_user );
 
 				}
+
+				/*
+				 * Set up query by proposal event.
+				 */
+				$proposal_event = $query->get( 'proposal_event' );
+				if ( ! is_numeric( $proposal_event ) || ! $proposal_event ) {
+					$proposal_event = 0;
+				}
+
+				/*
+				 * Set up query by proposal status.
+				 */
+				$proposal_status = $query->get( 'proposal_status' );
+
+				if ( ! $proposal_status && ! empty( $_GET['proposal_status'] ) ) {
+					$proposal_status = sanitize_text_field( $_GET['proposal_status'] );
+				} elseif ( ! $proposal_status ) {
+					$proposal_status = null;
+				}
+
+				// By default, only get confirmed proposals.
+				if ( empty( $proposal_status ) ) {
+
+					// Don't filter in the admin.
+					if ( ! is_admin() ) {
+						$proposal_status = array( 'confirmed' );
+					}
+				} elseif ( ! is_array( $proposal_status ) ) {
+					$proposal_status = explode( ',', str_replace( ' ', '', $proposal_status ) );
+				}
+
+				if ( ! empty( $proposal_status ) ) {
+					$proposal_status = array_map( 'strtolower', $proposal_status );
+				}
+
+				/*
+				 * Set up query by proposal ID(s).
+				 */
+				$by_proposal = $query->get( 'by_proposal' );
+
+				if ( ! $by_proposal && ! empty( $_GET['by_proposal'] ) ) {
+					$by_proposal = sanitize_text_field( $_GET['by_proposal'] );
+				} elseif ( ! $by_proposal ) {
+					$by_proposal = null;
+				}
+
+				if ( ! empty( $by_proposal ) ) {
+
+					// Make sure its an array.
+					if ( ! is_array( $by_proposal ) ) {
+						$by_proposal = explode( ',', str_replace( ' ', '', $by_proposal ) );
+					}
+
+					// Make sure they're IDs.
+					$by_proposal = array_filter( $by_proposal, 'is_numeric' );
+
+				}
+
+				if ( ! empty( $proposal_event ) || ! empty( $proposal_status ) || ! empty( $by_proposal ) ) {
+
+					// Join to get proposal information.
+					$pieces['join'] .= " INNER JOIN {$wpdb->postmeta} profile_sel ON profile_sel.meta_value = {$wpdb->posts}.ID AND profile_sel.meta_key REGEXP '^speakers\_([0-9]+)\_speaker$'";
+					$pieces['join'] .= " INNER JOIN {$wpdb->posts} proposal ON proposal.ID = profile_sel.post_id AND proposal.post_type = 'proposal' AND proposal.post_status = 'publish'";
+
+					// Join by event.
+					if ( ! empty( $proposal_event ) ) {
+						$pieces['join'] .= " INNER JOIN {$wpdb->term_relationships} proposal_event_rel ON proposal_event_rel.object_id = proposal.ID";
+						$pieces['join'] .= $wpdb->prepare( " INNER JOIN {$wpdb->term_taxonomy} proposal_event_tax ON proposal_event_tax.term_taxonomy_id = proposal_event_rel.term_taxonomy_id AND proposal_event_tax.taxonomy = 'event' AND proposal_event_tax.term_id = %s", $proposal_event );
+					}
+
+					// Join by status.
+					if ( ! empty( $proposal_status ) ) {
+
+						// "Join" to get proposal status.
+						$pieces['join'] .= " LEFT JOIN {$wpdb->postmeta} proposal_status ON proposal_status.post_id = proposal.ID AND proposal_status.meta_key = 'proposal_status'";
+
+						// If looking for submitted proposals, could be blank.
+						if ( in_array( 'submitted', $proposal_status ) ) {
+							$pieces['where'] .= " AND ( proposal_status.post_id IS NULL OR proposal_status.meta_value IN ('" . implode( "','", $proposal_status ) . "') )";
+						} else {
+							$pieces['where'] .= " AND proposal_status.meta_value IN ('" . implode( "','", $proposal_status ) . "')";
+						}
+					}
+
+					// Only by proposal ID.
+					if ( ! empty( $by_proposal ) ) {
+						$pieces['where'] .= " AND proposal.ID IN ('" . implode( "','", $by_proposal ) . "')";
+					}
+				}
+
 				break;
 
 			case 'proposal':
 
 				// Only if we're querying by the speaker.
-				if ( ! empty( $query->query_vars['proposal_speaker'] ) ) {
-
-					$proposal_speaker = $query->get( 'proposal_speaker' );
+				$proposal_speaker = $query->get( 'proposal_speaker' );
+				if ( ! empty( $proposal_speaker ) && is_numeric( $proposal_speaker ) ) {
 
 					// "Join" to get proposal status.
 					$pieces['join'] .= " LEFT JOIN {$wpdb->postmeta} proposal_speaker ON proposal_speaker.post_id = {$wpdb->posts}.ID AND proposal_speaker.meta_key REGEXP '^speakers\_([0-9]+)\_speaker$'";
@@ -273,34 +393,39 @@ class WPCampus_Speakers {
 				}
 
 				// Query against proposal status.
-				$proposal_status = null;
+				$proposal_status = $query->get( 'proposal_status' );
 
-				if ( ! empty( $query->query_vars['proposal_status'] ) ) {
-					$proposal_status = $query->get( 'proposal_status' );
-				} elseif ( ! empty( $_GET['proposal_status'] ) ) {
-					$proposal_status = $_GET['proposal_status'];
+				if ( ! $proposal_status && ! empty( $_GET['proposal_status'] ) ) {
+					$proposal_status = sanitize_text_field( $_GET['proposal_status'] );
 				}
 
 				// By default, only get confirmed proposals.
 				if ( empty( $proposal_status ) ) {
-					$proposal_status = array( 'confirmed' );
-				} else {
+
+					// Don't filter in the admin.
+					if ( ! is_admin() ) {
+						$proposal_status = array( 'confirmed' );
+					}
+				}
+
+				if ( ! empty( $proposal_status ) ) {
 
 					// Clean up query.
 					if ( ! is_array( $proposal_status ) ) {
 						$proposal_status = explode( ',', str_replace( ' ', '', $proposal_status ) );
-						$proposal_status = array_map( 'strtolower', $proposal_status );
 					}
-				}
 
-				// "Join" to get proposal status.
-				$pieces['join'] .= " LEFT JOIN {$wpdb->postmeta} proposal_status ON proposal_status.post_id = {$wpdb->posts}.ID AND proposal_status.meta_key = 'proposal_status'";
+					$proposal_status = array_map( 'strtolower', $proposal_status );
 
-				// If looking for submitted proposals, could be blank.
-				if ( in_array( 'submitted', $proposal_status ) ) {
-					$pieces['where'] .= " AND ( proposal_status.post_id IS NULL OR proposal_status.meta_value IN ('" . implode( "','", $proposal_status ) . "') )";
-				} else {
-					$pieces['where'] .= " AND proposal_status.meta_value IN ('" . implode( "','", $proposal_status ) . "')";
+					// "Join" to get proposal status.
+					$pieces['join'] .= " LEFT JOIN {$wpdb->postmeta} proposal_status ON proposal_status.post_id = {$wpdb->posts}.ID AND proposal_status.meta_key = 'proposal_status'";
+
+					// If looking for submitted proposals, could be blank.
+					if ( in_array( 'submitted', $proposal_status ) ) {
+						$pieces['where'] .= " AND ( proposal_status.post_id IS NULL OR proposal_status.meta_value IN ('" . implode( "','", $proposal_status ) . "') )";
+					} else {
+						$pieces['where'] .= " AND proposal_status.meta_value IN ('" . implode( "','", $proposal_status ) . "')";
+					}
 				}
 
 				break;

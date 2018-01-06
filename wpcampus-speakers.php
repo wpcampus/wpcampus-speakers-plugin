@@ -71,6 +71,8 @@ class WPCampus_Speakers {
 
 		// Filter queries.
 		add_filter( 'query_vars', array( $plugin, 'filter_query_vars' ) );
+		add_filter( 'rest_profile_collection_params', array( $plugin, 'filter_rest_params' ), 10, 2 );
+		add_filter( 'rest_proposal_collection_params', array( $plugin, 'filter_rest_params' ), 10, 2 );
 		add_filter( 'posts_clauses', array( $plugin, 'filter_posts_clauses' ), 100, 2 );
 
 		// Register our post types.
@@ -355,6 +357,56 @@ class WPCampus_Speakers {
 		$response['headshot'] = ! empty( $headshot ) ? $headshot : null;
 
 		return $response;
+	}
+
+	/**
+	 * Filter the query params
+	 * allowed by the REST API.
+	 */
+	public function filter_rest_params( $query_params, $post_type ) {
+
+		switch ( $post_type->name ) {
+
+			case 'profile':
+
+				$query_params['profile_user'] = array(
+					'description'   => __( 'Filter the profiles by the user assigned to the profile.', 'wpcampus' ),
+					'type'          => 'integer',
+				);
+				
+				$query_params['by_proposal'] = array(
+					'description'   => __( 'Filter the profiles by the profile assigned to a proposal ID.', 'wpcampus' ),
+					'type'          => 'integer',
+				);
+
+				$query_params['proposal_event'] = array(
+					'description'   => __( 'Filter the profiles by the event assigned to their proposal.', 'wpcampus' ),
+					'type'          => 'integer',
+				);
+
+				$query_params['proposal_status'] = array(
+					'description'   => __( 'Filter the profiles by the selection status assigned to their proposal.', 'wpcampus' ),
+					'type'          => 'string',
+				);
+
+				break;
+
+			case 'proposal':
+
+				$query_params['proposal_speaker'] = array(
+					'description'   => __( 'Filter the proposals by their speaker.', 'wpcampus' ),
+					'type'          => 'integer',
+				);
+
+				$query_params['proposal_status'] = array(
+					'description'   => __( 'Filter the proposals by their selection status.', 'wpcampus' ),
+					'type'          => 'string',
+				);
+
+				break;
+		}
+
+		return $query_params;
 	}
 
 	/**

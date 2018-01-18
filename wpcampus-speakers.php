@@ -269,7 +269,7 @@ class WPCampus_Speakers {
 
 		// Get event(s).
 		$response->data['events'] = array();
-		$events = wp_get_object_terms( $post->ID, 'event' );
+		$events = wp_get_object_terms( $post->ID, 'proposal_event' );
 		if ( ! empty( $events ) ) {
 			foreach ( $events as $event ) {
 				$response->data['events'][] = array(
@@ -497,7 +497,7 @@ class WPCampus_Speakers {
 					// Join by event.
 					if ( ! empty( $proposal_event ) ) {
 						$pieces['join'] .= " INNER JOIN {$wpdb->term_relationships} proposal_event_rel ON proposal_event_rel.object_id = proposal.ID";
-						$pieces['join'] .= $wpdb->prepare( " INNER JOIN {$wpdb->term_taxonomy} proposal_event_tax ON proposal_event_tax.term_taxonomy_id = proposal_event_rel.term_taxonomy_id AND proposal_event_tax.taxonomy = 'event' AND proposal_event_tax.term_id = %s", $proposal_event );
+						$pieces['join'] .= $wpdb->prepare( " INNER JOIN {$wpdb->term_taxonomy} proposal_event_tax ON proposal_event_tax.term_taxonomy_id = proposal_event_rel.term_taxonomy_id AND proposal_event_tax.taxonomy = 'proposal_event' AND proposal_event_tax.term_id = %s", $proposal_event );
 					}
 
 					// Join by status.
@@ -664,7 +664,7 @@ class WPCampus_Speakers {
 		));
 
 		// @TODO Only be able to access with authentication?
-		register_taxonomy( 'event', array( 'proposal' ), array(
+		register_taxonomy( 'proposal_event', array( 'proposal' ), array(
 			'labels' => array(
 				'name'                          => _x( 'Events', 'Taxonomy General Name', 'wpcampus' ),
 				'singular_name'                 => _x( 'Event', 'Taxonomy Singular Name', 'wpcampus' ),

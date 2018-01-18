@@ -86,7 +86,7 @@ class WPCampus_Speakers_Admin {
 		add_menu_page( __( 'Speakers', 'wpcampus' ), __( 'Speakers', 'wpcampus' ), 'manage_wpc_speakers', 'wpc-speakers', array( $plugin, 'print_speakers_main_page' ), 'dashicons-megaphone', 22 );
 
 		// Add taxonomy pages under speakers.
-		add_submenu_page( 'wpc-speakers', __( 'Events', 'wpcampus' ), __( 'Events', 'wpcampus' ), 'manage_categories', 'edit-tags.php?taxonomy=event&section=wpc-speakers' );
+		add_submenu_page( 'wpc-speakers', __( 'Events', 'wpcampus' ), __( 'Events', 'wpcampus' ), 'manage_categories', 'edit-tags.php?taxonomy=proposal_event&section=wpc-speakers' );
 		add_submenu_page( 'wpc-speakers', __( 'Session Types', 'wpcampus' ), __( 'Session Types', 'wpcampus' ), 'manage_categories', 'edit-tags.php?taxonomy=session_type&section=wpc-speakers' );
 		add_submenu_page( 'wpc-speakers', __( 'Subjects', 'wpcampus' ), __( 'Subjects', 'wpcampus' ), 'manage_categories', 'edit-tags.php?taxonomy=subjects&section=wpc-speakers' );
 
@@ -105,7 +105,7 @@ class WPCampus_Speakers_Admin {
 		$current_screen = get_current_screen();
 
 		// Show taxonomies under "Speakers" menu.
-		if ( ! empty( $current_screen->taxonomy ) && in_array( $current_screen->taxonomy, array( 'event', 'session_type', 'subjects' ) ) ) {
+		if ( ! empty( $current_screen->taxonomy ) && in_array( $current_screen->taxonomy, array( 'proposal_event', 'session_type', 'subjects' ) ) ) {
 			if ( isset( $_GET['section'] ) && 'wpc-speakers' == $_GET['section'] ) {
 				return $_GET['section'];
 			}
@@ -360,7 +360,7 @@ class WPCampus_Speakers_Admin {
 	public function remove_meta_boxes() {
 
 		// We use ACF to manage events.
-		remove_meta_box( 'tagsdiv-event', 'proposal', 'side' );
+		remove_meta_box( 'tagsdiv-proposal_event', 'proposal', 'side' );
 
 	}
 
@@ -389,7 +389,7 @@ class WPCampus_Speakers_Admin {
 			FROM {$wpdb->posts} proposal
 			INNER JOIN {$wpdb->postmeta} proposalm1 ON proposalm1.post_id = proposal.ID AND proposalm1.meta_key REGEXP '^speakers\_([0-9]+)\_speaker$' AND proposalm1.meta_value = %s
 			LEFT JOIN {$wpdb->postmeta} proposalm2 ON proposalm2.post_id = proposal.ID AND proposalm2.meta_key = 'proposal_status'
-			LEFT JOIN {$wpdb->postmeta} eventm ON eventm.post_id = proposal.ID AND eventm.meta_key = 'event'
+			LEFT JOIN {$wpdb->postmeta} eventm ON eventm.post_id = proposal.ID AND eventm.meta_key = 'proposal_event'
 			LEFT JOIN {$wpdb->terms} eventt ON eventt.term_id = eventm.meta_value
 			WHERE proposal.post_type = 'proposal' AND proposal.post_status = 'publish'", $speaker_id
 		));
@@ -437,8 +437,8 @@ class WPCampus_Speakers_Admin {
 							if ( ! empty( $proposal->event_slug ) ) :
 
 								$filter_url = add_query_arg( array(
-									'post_type' => 'proposal',
-									'event'     => $proposal->event_slug,
+									'post_type'         => 'proposal',
+									'proposal_event'    => $proposal->event_slug,
 								), admin_url( 'edit.php' ) );
 
 								?><a href="<?php echo $filter_url; ?>"><?php echo $proposal->event_name; ?></a><?php

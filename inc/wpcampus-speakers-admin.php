@@ -495,7 +495,7 @@ class WPCampus_Speakers_Admin {
 				break;
 
 			case 'declined':
-				?><span style="color:red;"><?php _e( 'Declined', 'wpcampus' ); ?></span><?php
+				?><span style="color:#900;"><?php _e( 'Declined', 'wpcampus' ); ?></span><?php
 				break;
 
 			case 'selected':

@@ -9,11 +9,9 @@
 class WPCampus_Speakers_Admin {
 
 	/**
-	 * Constructing the class object.
-	 *
-	 * @access  public
+	 * We don't need to instantiate this class.
 	 */
-	public function __construct() {}
+	protected function __construct() {}
 
 	/**
 	 * Registers all of our hooks and what not.

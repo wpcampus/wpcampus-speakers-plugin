@@ -305,6 +305,11 @@ class WPCampus_Speakers_Admin {
 					break;
 				}
 
+				// If a proposal event is selected, add hidden input for filters.
+				if ( ! empty( $_GET['proposal_event'] ) ) :
+					?><input type="hidden" name="proposal_event" value="<?php echo esc_attr( $_GET['proposal_event'] ); ?>" /><?php
+				endif;
+
 				$proposal_status_choices = array(
 					'confirmed' => __( 'Confirmed', 'wpcampus' ),
 					'declined'  => __( 'Declined', 'wpcampus' ),

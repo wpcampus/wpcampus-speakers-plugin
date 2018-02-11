@@ -129,6 +129,46 @@ function wpcampus_speakers_add_fields() {
 			'active' => 1,
 			'description' => '',
 		));
+
+		acf_add_local_field_group(array(
+			'key' => 'group_5a80b2ac9a829',
+			'title' => __( 'Proposal: The Asset(s)', 'wpcampus' ),
+			'fields' => array(
+				array(
+					'key' => 'field_5a80b2cb6635e',
+					'label' => __( 'Session Video', 'wpcampus' ),
+					'name' => 'session_video',
+					'type' => 'post_object',
+					'instructions' => __( 'Select the recording from our library of videos.', 'wpcampus' ),
+					'required' => 0,
+					'conditional_logic' => 0,
+					'post_type' => array(
+						0 => 'video',
+					),
+					'allow_null' => 1,
+					'multiple' => 0,
+					'return_format' => 'id',
+					'ui' => 1,
+				),
+			),
+			'location' => array(
+				array(
+					array(
+						'param' => 'post_type',
+						'operator' => '==',
+						'value' => 'proposal',
+					),
+				),
+			),
+			'menu_order' => 5,
+			'position' => 'normal',
+			'style' => 'default',
+			'label_placement' => 'left',
+			'instruction_placement' => 'field',
+			'hide_on_screen' => '',
+			'active' => 1,
+			'description' => '',
+		));
 	endif;
 
 	acf_add_local_field_group( array(

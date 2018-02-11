@@ -238,7 +238,7 @@ class WPCampus_Speakers {
 			}
 		}
 
-		// Add custom data.
+		// Add proposal status.
 		$proposal_status = preg_replace( '/([^a-z])/i', '', get_post_meta( $post->ID, 'proposal_status', true ) );
 		$response->data['proposal_status'] = ! empty( $proposal_status ) ? strtolower( $proposal_status ) : null;
 
@@ -292,6 +292,15 @@ class WPCampus_Speakers {
 				);
 			}
 		}
+
+		// Get WPCampus video post ID.
+		$session_video_id = get_post_meta( $post->ID, 'session_video', true );
+
+		// Get the YouTube ID.
+		$youtube_id = $session_video_id > 0 ? get_post_meta( $session_video_id, 'wpc_youtube_video_id', true ) : null;
+
+		// Store the YouTube ID.
+		$response->data['session_video'] = ! empty( $youtube_id ) ? $youtube_id : null;
 
 		return $response;
 	}
@@ -373,7 +382,7 @@ class WPCampus_Speakers {
 					'description'   => __( 'Filter the profiles by the user assigned to the profile.', 'wpcampus' ),
 					'type'          => 'integer',
 				);
-				
+
 				$query_params['by_proposal'] = array(
 					'description'   => __( 'Filter the profiles by the profile assigned to a proposal ID.', 'wpcampus' ),
 					'type'          => 'integer',

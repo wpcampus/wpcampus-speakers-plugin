@@ -174,8 +174,9 @@ class WPCampus_Speakers_Admin {
 	 */
 	public function add_proposal_columns( $columns ) {
 		return $this->add_admin_columns( $columns, array(
-			'proposal_status'   => __( 'Status', 'wpcampus' ),
-			'proposal_speaker'  => __( 'Speaker(s)', 'wpcampus' ),
+			'proposal_status'  => __( 'Status', 'wpcampus' ),
+			'proposal_speaker' => __( 'Speaker(s)', 'wpcampus' ),
+			'proposal_video'   => __( 'Video', 'wpcampus' ),
 		));
 	}
 
@@ -282,6 +283,18 @@ class WPCampus_Speakers_Admin {
 						endif;
 						$speaker_count++;
 					endwhile;
+				endif;
+				break;
+
+			case 'proposal_video':
+
+				// Get the video
+				$video_url = wpcampus_speakers()->get_session_video_url( $post_id );
+
+				if ( empty( $video_url ) ) :
+					?><em><?php _e( 'No video', 'wpcampus' ); ?></em><?php
+				else :
+					?><a href="<?php echo $video_url; ?>" target="_blank"><?php _e( 'View video', 'wpcampus' ); ?></a><?php
 				endif;
 				break;
 		}

@@ -81,6 +81,15 @@ class WPCampus_Speakers {
 	}
 
 	/**
+	 * Build and return a video's YouTube
+	 * watch URL based on the video ID.
+	 */
+	public function get_youtube_url( $youtube_id ) {
+		$youtube_watch_url = 'https://www.youtube.com/watch';
+		return add_query_arg( 'v', $youtube_id, $youtube_watch_url );
+	}
+
+	/**
 	 * Returns true if route matches
 	 * one of our speaker post types.
 	 */
@@ -299,8 +308,9 @@ class WPCampus_Speakers {
 		// Get the YouTube ID.
 		$youtube_id = $session_video_id > 0 ? get_post_meta( $session_video_id, 'wpc_youtube_video_id', true ) : null;
 
-		// Store the YouTube ID.
+		// Store the YouTube ID and URL.
 		$response->data['session_video'] = ! empty( $youtube_id ) ? $youtube_id : null;
+		$response->data['session_video_url'] = ! empty( $youtube_id ) ? $this->get_youtube_url( $youtube_id ) : null;
 
 		return $response;
 	}

@@ -27,22 +27,194 @@ if ( ! defined( 'WPINC' ) ) {
 	die;
 }
 
-require_once plugin_dir_path( __FILE__ ) . 'inc/wpcampus-speakers-fields.php';
+require_once wpcampus_speakers()->get_plugin_dir() . 'inc/wpcampus-speakers-fields.php';
 
 // We only need you in the admin.
 if ( is_admin() ) {
-	require_once plugin_dir_path( __FILE__ ) . 'inc/wpcampus-speakers-admin.php';
+	require_once wpcampus_speakers()->get_plugin_dir() . 'inc/wpcampus-speakers-admin.php';
+}
+
+/**
+ * Class that manages and returns plugin data.
+ *
+ * @class       WPCampus_Speakers
+ * @package     WPCampus Speakers
+ */
+final class WPCampus_Speakers {
+
+	/**
+	 * Holds the plugin version.
+	 *
+	 * @var     string
+	 */
+	private $version = '1.0.0';
+
+	/**
+	 * Holds the absolute URL to
+	 * the main plugin directory.
+	 *
+	 * @var     string
+	 */
+	private $plugin_url;
+
+	/**
+	 * Holds the directory path
+	 * to the main plugin directory.
+	 *
+	 * @var     string
+	 */
+	private $plugin_dir;
+
+	/**
+	 * Holds the class instance.
+	 *
+	 * @var     WPCampus_Speakers
+	 */
+	private static $instance;
+
+	/**
+	 * Returns the instance of this class.
+	 *
+	 * @return  WPCampus_Speakers
+	 */
+	public static function instance() {
+		if ( ! isset( self::$instance ) ) {
+			$class_name = __CLASS__;
+			self::$instance = new $class_name;
+		}
+		return self::$instance;
+	}
+
+	/**
+	 * Magic method to output a string if
+	 * trying to use the object as a string.
+	 *
+	 * @return  string
+	 */
+	public function __toString() {
+		return 'WPCampus_Speakers';
+	}
+
+	/**
+	 * Method to keep our instance
+	 * from being cloned or unserialized
+	 * and to prevent a fatal error when
+	 * calling a method that doesn't exist.
+	 *
+	 * @return  void
+	 */
+	public function __clone() {}
+	public function __wakeup() {}
+	public function __call( $method = '', $args = array() ) {}
+
+	/**
+	 * Start your engines.
+	 */
+	protected function __construct() {
+
+		// Store the plugin URL and DIR.
+		$this->plugin_url = plugin_dir_url( __FILE__ );
+		$this->plugin_dir = plugin_dir_path( __FILE__ );
+
+	}
+
+	/**
+	 * Returns the plugin version.
+	 *
+	 * @return  string
+	 */
+	public function get_version() {
+		return $this->version;
+	}
+
+	/**
+	 * Returns the absolute URL to
+	 * the main plugin directory.
+	 *
+	 * @return  string
+	 */
+	public function get_plugin_url() {
+		return $this->plugin_url;
+	}
+
+	/**
+	 * Returns the directory path
+	 * to the main plugin directory.
+	 *
+	 * @return  string
+	 */
+	public function get_plugin_dir() {
+		return $this->plugin_dir;
+	}
+
+	/**
+	 * Build and return a video's YouTube
+	 * watch URL based on the video ID.
+	 */
+	public function get_youtube_url( $youtube_id ) {
+		$youtube_watch_url = 'https://www.youtube.com/watch';
+		return add_query_arg( 'v', $youtube_id, $youtube_watch_url );
+	}
+
+	/**
+	 * Build and return a video's YouTube
+	 * watch URL based on the video ID.
+	 */
+	public function get_video_youtube_id( $video_post_id ) {
+		return get_post_meta( $video_post_id, 'wpc_youtube_video_id', true );
+	}
+
+	/**
+	 * Get the proposal's session video URL.
+	 */
+	public function get_session_video( $post_id ) {
+		return get_post_meta( $post_id, 'session_video', true );
+	}
+
+	/**
+	 * Get the proposal's session video URL.
+	 */
+	public function get_session_video_url( $post_id ) {
+
+		// Get WPCampus video post ID.
+		$session_video_id = $this->get_session_video( $post_id );
+
+		if ( ! $session_video_id ) {
+			return '';
+		}
+
+		// Get the YouTube ID.
+		$youtube_id = $this->get_video_youtube_id( $session_video_id );
+
+		if ( empty( $youtube_id ) ) {
+			return '';
+		}
+
+		// Return the YouTube URL.
+		return $this->get_youtube_url( $youtube_id );
+	}
+}
+
+/**
+ * Returns the instance of our WPCampus_Speakers class.
+ *
+ * Use this function and class methods
+ * to retrieve plugin data.
+ *
+ * @return  WPCampus_Speakers
+ */
+function wpcampus_speakers() {
+	return WPCampus_Speakers::instance();
 }
 
 /**
  * PHP class that holds the main/administrative
  * functionality for the plugin.
  *
- * @since       1.0.0
  * @category    Class
  * @package     WPCampus Speakers
  */
-class WPCampus_Speakers {
+class WPCampus_Speakers_Plugin {
 
 	/**
 	 * Warming up the engine.
@@ -78,15 +250,6 @@ class WPCampus_Speakers {
 		// Register our post types.
 		add_action( 'init', array( $plugin, 'register_custom_post_types_taxonomies' ) );
 
-	}
-
-	/**
-	 * Build and return a video's YouTube
-	 * watch URL based on the video ID.
-	 */
-	public function get_youtube_url( $youtube_id ) {
-		$youtube_watch_url = 'https://www.youtube.com/watch';
-		return add_query_arg( 'v', $youtube_id, $youtube_watch_url );
 	}
 
 	/**
@@ -303,14 +466,14 @@ class WPCampus_Speakers {
 		}
 
 		// Get WPCampus video post ID.
-		$session_video_id = get_post_meta( $post->ID, 'session_video', true );
+		$session_video_id = wpcampus_speakers()->get_session_video( $post->ID );
 
 		// Get the YouTube ID.
-		$youtube_id = $session_video_id > 0 ? get_post_meta( $session_video_id, 'wpc_youtube_video_id', true ) : null;
+		$youtube_id = $session_video_id > 0 ? wpcampus_speakers()->get_video_youtube_id( $session_video_id ) : null;
 
 		// Store the YouTube ID and URL.
 		$response->data['session_video'] = ! empty( $youtube_id ) ? $youtube_id : null;
-		$response->data['session_video_url'] = ! empty( $youtube_id ) ? $this->get_youtube_url( $youtube_id ) : null;
+		$response->data['session_video_url'] = ! empty( $youtube_id ) ? wpcampus_speakers()->get_youtube_url( $youtube_id ) : null;
 
 		return $response;
 	}
@@ -744,4 +907,4 @@ class WPCampus_Speakers {
 		));
 	}
 }
-WPCampus_Speakers::register();
+WPCampus_Speakers_Plugin::register();

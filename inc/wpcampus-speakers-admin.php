@@ -288,13 +288,18 @@ class WPCampus_Speakers_Admin {
 
 			case 'proposal_video':
 
-				// Get the video
-				$video_url = wpcampus_speakers()->get_session_video_url( $post_id );
+				// Get the video.
+				$session_video_id = wpcampus_speakers()->get_session_video( $post_id );
 
-				if ( empty( $video_url ) ) :
+				if ( ! $session_video_id ) :
 					?><em><?php _e( 'No video', 'wpcampus' ); ?></em><?php
 				else :
-					?><a href="<?php echo $video_url; ?>" target="_blank"><?php _e( 'View video', 'wpcampus' ); ?></a><?php
+
+					// Get URLs.
+					$video_url = wpcampus_speakers()->get_session_video_url( $post_id, $session_video_id );
+					$edit_video_url = get_edit_post_link( $session_video_id );
+
+					?><a href="<?php echo $video_url; ?>" target="_blank"><?php _e( 'View video', 'wpcampus' ); ?></a> (<a href="<?php echo $edit_video_url; ?>"><?php _e( 'Edit', 'wpcampus' ); ?></a>)<?php
 				endif;
 				break;
 		}

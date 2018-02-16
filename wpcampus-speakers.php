@@ -174,13 +174,15 @@ final class WPCampus_Speakers {
 	/**
 	 * Get the proposal's session video URL.
 	 */
-	public function get_session_video_url( $post_id ) {
+	public function get_session_video_url( $post_id, $session_video_id = 0 ) {
 
 		// Get WPCampus video post ID.
-		$session_video_id = $this->get_session_video( $post_id );
-
 		if ( ! $session_video_id ) {
-			return '';
+			$session_video_id = $this->get_session_video( $post_id );
+
+			if ( ! $session_video_id ) {
+				return '';
+			}
 		}
 
 		// Get the YouTube ID.

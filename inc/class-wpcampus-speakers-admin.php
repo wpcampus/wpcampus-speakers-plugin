@@ -451,6 +451,7 @@ class WPCampus_Speakers_Admin {
 				}
 
 				$this->add_proposal_status_filter( $post_status );
+				$this->add_proposal_event_filter( $post_status );
 
 				break;
 		}
@@ -463,13 +464,6 @@ class WPCampus_Speakers_Admin {
 	 */
 	public function add_proposal_status_filter( $post_status ) {
 		global $wpdb;
-
-		// If a proposal event is selected, add hidden input for filters.
-		if ( ! empty( $_GET['proposal_event'] ) ) :
-			?>
-			<input type="hidden" name="proposal_event" value="<?php echo esc_attr( $_GET['proposal_event'] ); ?>" />
-			<?php
-		endif;
 
 		$proposal_status_choices = array(
 			'confirmed' => array(
@@ -525,6 +519,36 @@ class WPCampus_Speakers_Admin {
 			foreach ( $proposal_status_choices as $value => $choice ) :
 				?>
 				<option value="<?php echo $value; ?>"<?php selected( $selected_proposal_status, $value ); ?>><?php echo $choice['label']; ?> (<?php echo $choice['count']; ?>)</option>
+				<?php
+			endforeach;
+
+			?>
+		</select>
+		<?php
+	}
+
+	/**
+	 * Add the proposal event filter.
+	 *
+	 * @args    $post_status - string - the current post status.
+	 */
+	public function add_proposal_event_filter( $post_status ) {
+
+		$proposal_events = get_terms( array(
+			'taxonomy'   => 'proposal_event',
+			'hide_empty' => true,
+		));
+
+		$selected_proposal_event = ! empty( $_GET['proposal_event'] ) ? sanitize_text_field( $_GET['proposal_event'] ) : null;
+
+		?>
+		<select name="proposal_event">
+			<option value=""><?php _e( 'Sort by event', 'wpcampus' ); ?></option>
+			<?php
+
+			foreach ( $proposal_events as $term ) :
+				?>
+				<option value="<?php echo $term->slug; ?>"<?php selected( $selected_proposal_event, $term->slug ); ?>><?php echo $term->name; ?> (<?php echo $term->count; ?>)</option>
 				<?php
 			endforeach;
 

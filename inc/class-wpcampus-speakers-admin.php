@@ -570,6 +570,10 @@ class WPCampus_Speakers_Admin {
 		// We use ACF to manage events.
 		remove_meta_box( 'tagsdiv-proposal_event', 'proposal', 'side' );
 
+		// Help clean up the admin.
+		remove_meta_box( 'slugdiv', 'profile', 'normal' );
+		remove_meta_box( 'slugdiv', 'proposal', 'normal' );
+
 	}
 
 	/**

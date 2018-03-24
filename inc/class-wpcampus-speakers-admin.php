@@ -463,28 +463,27 @@ class WPCampus_Speakers_Admin {
 	 * @args    $post_status - string - the current post status.
 	 */
 	public function add_proposal_status_filter( $post_status ) {
-		global $wpdb;
 
 		$proposal_status_choices = array(
 			'confirmed' => array(
-				'count' => 0,
+				//'count' => 0,
 				'label' => __( 'Confirmed', 'wpcampus' ),
 			),
 			'declined'  => array(
-				'count' => 0,
+				//'count' => 0,
 				'label' => __( 'Declined', 'wpcampus' ),
 			),
 			'selected'  => array(
-				'count' => 0,
+				//'count' => 0,
 				'label' => __( 'Selected', 'wpcampus' ),
 			),
 			'submitted' => array(
-				'count' => 0,
+				//'count' => 0,
 				'label' => __( 'Submitted', 'wpcampus' ),
 			),
 		);
 
-		$db_counts = $wpdb->get_results(
+		/*$db_counts = $wpdb->get_results(
 			$wpdb->prepare(
 				"SELECT DISTINCT meta_keys.meta_value AS status, COUNT(*) AS count
 				FROM {$wpdb->postmeta} meta_keys
@@ -507,7 +506,7 @@ class WPCampus_Speakers_Admin {
 				}
 				$proposal_status_choices[ $count->status ]['count'] = $count->count;
 			}
-		}
+		}*/
 
 		$selected_proposal_status = ! empty( $_GET['proposal_status'] ) ? sanitize_text_field( $_GET['proposal_status'] ) : null;
 
@@ -518,7 +517,7 @@ class WPCampus_Speakers_Admin {
 
 			foreach ( $proposal_status_choices as $value => $choice ) :
 				?>
-				<option value="<?php echo $value; ?>"<?php selected( $selected_proposal_status, $value ); ?>><?php echo $choice['label']; ?> (<?php echo $choice['count']; ?>)</option>
+				<option value="<?php echo $value; ?>"<?php selected( $selected_proposal_status, $value ); ?>><?php echo $choice['label']; ?></option>
 				<?php
 			endforeach;
 
@@ -548,7 +547,7 @@ class WPCampus_Speakers_Admin {
 
 			foreach ( $proposal_events as $term ) :
 				?>
-				<option value="<?php echo $term->slug; ?>"<?php selected( $selected_proposal_event, $term->slug ); ?>><?php echo $term->name; ?> (<?php echo $term->count; ?>)</option>
+				<option value="<?php echo $term->slug; ?>"<?php selected( $selected_proposal_event, $term->slug ); ?>><?php echo $term->name; ?></option>
 				<?php
 			endforeach;
 

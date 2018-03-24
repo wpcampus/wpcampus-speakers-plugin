@@ -588,6 +588,22 @@ class WPCampus_Speakers_Admin {
 					'high'
 				);
 
+				// Add a meta box to link to the session info.
+				$speaker_ids = wpcampus_speakers()->get_proposal_speaker_ids( $post->ID );
+				if ( ! empty( $speaker_ids ) ) {
+					add_meta_box(
+						'wpcampus-edit-profiles',
+						sprintf( __( '%s: Edit Speaker(s)', 'wpcampus' ), 'WPCampus' ),
+						array( $this, 'print_meta_boxes' ),
+						$post_type,
+						'side',
+						'high',
+						array(
+							'profiles' => $speaker_ids,
+						)
+					);
+				}
+
 				// WPCampus Speaker Information.
 				add_meta_box(
 					'wpcampus-speakers-details',
@@ -648,6 +664,10 @@ class WPCampus_Speakers_Admin {
 				$this->print_proposal_instructions();
 				break;
 
+			case 'wpcampus-edit-profiles':
+				$this->print_edit_profiles_mb( $metabox['args'] );
+				break;
+
 			case 'wpcampus-speakers-proposal':
 				$this->print_speaker_proposals_table( $post->ID );
 				break;
@@ -693,6 +713,34 @@ class WPCampus_Speakers_Admin {
 			</ul>
 		</div>
 		<?php
+	}
+
+	/**
+	 * Print the "Edit Profiles" meta box which
+	 * has buttons to easily edit the session
+	 * and clear the cache.
+	 */
+	public function print_edit_profiles_mb( $args = array() ) {
+		$profiles = ! empty( $args['profiles'] ) ? $args['profiles'] : array();
+		if ( ! empty( $profiles ) ) :
+			?>
+			<div style="background:rgba(0,115,170,0.07);padding:18px;color:#000;margin:-6px -12px -12px -12px;">
+				<?php
+
+				foreach( $profiles as $profile_id ) :
+
+					$edit_url = get_edit_post_link( $profile_id );
+					$display_name = get_post_meta( $profile_id, 'display_name', true );
+
+					?>
+					<a class="button button-primary button-large" style="display:block;text-align:center;" href="<?php echo $edit_url; ?>" target="_blank"><?php printf( __( 'Edit %s', 'wpcampus-speakers' ), $display_name ); ?></a>
+					<?php
+				endforeach;
+
+				?>
+			</div>
+			<?php
+		endif;
 	}
 
 	/**

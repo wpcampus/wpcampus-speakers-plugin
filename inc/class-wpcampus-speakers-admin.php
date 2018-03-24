@@ -225,7 +225,6 @@ class WPCampus_Speakers_Admin {
 
 		return $this->add_admin_columns( $columns, array(
 			'profile_name'      => __( 'Speaker', 'wpcampus' ),
-			'profile_user'      => __( 'User', 'wpcampus' ),
 			'profile_email'     => __( 'Email', 'wpcampus' ),
 			'profile_proposals' => __( 'Proposals', 'wpcampus' ),
 		));
@@ -254,28 +253,41 @@ class WPCampus_Speakers_Admin {
 				$headshot = get_the_post_thumbnail_url( $post_id, 'thumbnail' );
 				if ( ! empty( $headshot ) ) :
 					$display_name = sanitize_text_field( get_post_meta( $post_id, 'display_name', true ) );
-					?><img class="wpc-profile-thumb" src="<?php echo $headshot; ?>" alt="<?php printf( esc_attr__( 'Headshot for %s', 'wpcampus' ), $display_name ); ?>" /><?php
+					?>
+					<img class="wpc-profile-thumb" src="<?php echo $headshot; ?>" alt="<?php printf( esc_attr__( 'Headshot for %s', 'wpcampus' ), $display_name ); ?>" />
+					<?php
 				else :
-					?><div class="wpc-profile-thumb-default"></div><?php
+					?>
+					<div class="wpc-profile-thumb-default"></div>
+					<?php
 				endif;
 				break;
 
 			case 'profile_name':
-				echo get_post_meta( $post_id, 'display_name', true );
-				break;
 
-			case 'profile_user':
+				// Print display name.
+				$display_name = get_post_meta( $post_id, 'display_name', true );
+				echo $display_name;
+
+				// Print link to user.
 				$profile_user_id = get_post_meta( $post_id, 'wordpress_user', true );
 				if ( $profile_user_id > 0 ) :
 					$user = get_userdata( $profile_user_id );
 					if ( false !== $user ) :
 
 						// Setup the filter URL.
+						// @TODO: Not sanitized.
 						$filters = $_GET;
 						$filters['profile_user'] = $profile_user_id;
 						$filter_url = add_query_arg( $filters, 'edit.php' );
 
-						?><a href="<?php echo $filter_url; ?>"><?php echo $user->display_name; ?></a><?php
+						if ( ! empty( $display_name ) ) {
+							echo '<br>';
+						}
+
+						?>
+						<a href="<?php echo $filter_url; ?>"><?php echo $user->display_name; ?></a>
+						<?php
 					endif;
 				endif;
 				break;
@@ -283,7 +295,9 @@ class WPCampus_Speakers_Admin {
 			case 'profile_email':
 				$email = get_post_meta( $post_id, 'email', true );
 				if ( ! empty( $email ) ) :
-					?><a href="mailto:<?php echo $email; ?>"><?php echo $email; ?></a><?php
+					?>
+					<a href="mailto:<?php echo $email; ?>"><?php echo $email; ?></a>
+					<?php
 				endif;
 				break;
 
@@ -303,8 +317,9 @@ class WPCampus_Speakers_Admin {
 						'proposal_speaker'  => $post_id,
 					), admin_url( 'edit.php' ) );
 
-					?><a href="<?php echo $filter_url; ?>"><?php printf( _n( '%s proposal', '%s proposals', $proposals_count, 'wpcampus' ), $proposals_count ); ?></a><?php
-
+					?>
+					<a href="<?php echo $filter_url; ?>"><?php printf( _n( '%s proposal', '%s proposals', $proposals_count, 'wpcampus' ), $proposals_count ); ?></a>
+					<?php
 				endif;
 				break;
 		}
@@ -364,6 +379,7 @@ class WPCampus_Speakers_Admin {
 							if ( ! empty( $speaker_display_name ) ) :
 
 								// Setup the filter URL.
+								// @TODO: Not sanitized.
 								$filters = $_GET;
 								$filters['proposal_speaker'] = $speaker_id;
 								$filter_url = add_query_arg( $filters, 'edit.php' );

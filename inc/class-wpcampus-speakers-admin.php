@@ -422,7 +422,6 @@ class WPCampus_Speakers_Admin {
 	 * Adds a dropdown to filter proposals.
 	 */
 	public function add_proposal_filters( $post_type ) {
-		global $wpdb;
 
 		switch ( $post_type ) {
 
@@ -435,76 +434,87 @@ class WPCampus_Speakers_Admin {
 					break;
 				}
 
-				// If a proposal event is selected, add hidden input for filters.
-				if ( ! empty( $_GET['proposal_event'] ) ) :
-					?>
-					<input type="hidden" name="proposal_event" value="<?php echo esc_attr( $_GET['proposal_event'] ); ?>" />
-					<?php
-				endif;
-
-				$proposal_status_choices = array(
-					'confirmed' => array(
-						'count' => 0,
-						'label' => __( 'Confirmed', 'wpcampus' ),
-					),
-					'declined'  => array(
-						'count' => 0,
-						'label' => __( 'Declined', 'wpcampus' ),
-					),
-					'selected'  => array(
-						'count' => 0,
-						'label' => __( 'Selected', 'wpcampus' ),
-					),
-					'submitted' => array(
-						'count' => 0,
-						'label' => __( 'Submitted', 'wpcampus' ),
-					),
-				);
-
-				$db_counts = $wpdb->get_results(
-					$wpdb->prepare(
-						"SELECT DISTINCT meta_keys.meta_value AS status, COUNT(*) AS count
-						FROM {$wpdb->postmeta} meta_keys
-						INNER JOIN {$wpdb->posts} posts ON posts.ID = meta_keys.post_id AND posts.post_type = 'proposal' AND IF ( %s != '', posts.post_status = %s, true )
-						WHERE meta_keys.meta_key = 'proposal_status' GROUP BY meta_keys.meta_value",
-						$post_status, $post_status
-					)
-				);
-
-				if ( ! empty( $db_counts ) ) {
-					foreach( $db_counts as $count ) {
-						if ( empty( $count->status ) ) {
-							continue;
-						}
-						if ( ! isset( $proposal_status_choices[ $count->status ] ) ) {
-							continue;
-						}
-						if ( empty( $count->count ) ) {
-							continue;
-						}
-						$proposal_status_choices[ $count->status ]['count'] = $count->count;
-					}
-				}
-
-				$selected_proposal_status = ! empty( $_GET['proposal_status'] ) ? $_GET['proposal_status'] : null;
-
-				?>
-				<select name="proposal_status">
-					<option value=""><?php _e( 'Sort by status', 'wpcampus' ); ?></option>
-					<?php
-
-					foreach ( $proposal_status_choices as $value => $choice ) :
-						?>
-						<option value="<?php echo $value; ?>"<?php selected( $selected_proposal_status, $value ); ?>><?php echo $choice['label']; ?> (<?php echo $choice['count']; ?>)</option>
-						<?php
-					endforeach;
-
-					?>
-				</select>
-				<?php
+				$this->add_proposal_status_filter( $post_status );
 
 				break;
 		}
+	}
+
+	/**
+	 * Add the proposal status filter.
+	 *
+	 * @args    $post_status - string - the current post status.
+	 */
+	public function add_proposal_status_filter( $post_status ) {
+		global $wpdb;
+
+		// If a proposal event is selected, add hidden input for filters.
+		if ( ! empty( $_GET['proposal_event'] ) ) :
+			?>
+			<input type="hidden" name="proposal_event" value="<?php echo esc_attr( $_GET['proposal_event'] ); ?>" />
+			<?php
+		endif;
+
+		$proposal_status_choices = array(
+			'confirmed' => array(
+				'count' => 0,
+				'label' => __( 'Confirmed', 'wpcampus' ),
+			),
+			'declined'  => array(
+				'count' => 0,
+				'label' => __( 'Declined', 'wpcampus' ),
+			),
+			'selected'  => array(
+				'count' => 0,
+				'label' => __( 'Selected', 'wpcampus' ),
+			),
+			'submitted' => array(
+				'count' => 0,
+				'label' => __( 'Submitted', 'wpcampus' ),
+			),
+		);
+
+		$db_counts = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT DISTINCT meta_keys.meta_value AS status, COUNT(*) AS count
+				FROM {$wpdb->postmeta} meta_keys
+				INNER JOIN {$wpdb->posts} posts ON posts.ID = meta_keys.post_id AND posts.post_type = 'proposal' AND IF ( %s != '', posts.post_status = %s, true )
+				WHERE meta_keys.meta_key = 'proposal_status' GROUP BY meta_keys.meta_value",
+				$post_status, $post_status
+			)
+		);
+
+		if ( ! empty( $db_counts ) ) {
+			foreach( $db_counts as $count ) {
+				if ( empty( $count->status ) ) {
+					continue;
+				}
+				if ( ! isset( $proposal_status_choices[ $count->status ] ) ) {
+					continue;
+				}
+				if ( empty( $count->count ) ) {
+					continue;
+				}
+				$proposal_status_choices[ $count->status ]['count'] = $count->count;
+			}
+		}
+
+		$selected_proposal_status = ! empty( $_GET['proposal_status'] ) ? $_GET['proposal_status'] : null;
+
+		?>
+		<select name="proposal_status">
+			<option value=""><?php _e( 'Sort by status', 'wpcampus' ); ?></option>
+			<?php
+
+			foreach ( $proposal_status_choices as $value => $choice ) :
+				?>
+				<option value="<?php echo $value; ?>"<?php selected( $selected_proposal_status, $value ); ?>><?php echo $choice['label']; ?> (<?php echo $choice['count']; ?>)</option>
+				<?php
+			endforeach;
+
+			?>
+		</select>
+		<?php
 	}
 
 	/**

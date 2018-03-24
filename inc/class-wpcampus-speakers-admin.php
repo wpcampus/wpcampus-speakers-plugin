@@ -41,6 +41,7 @@ class WPCampus_Speakers_Admin {
 		// Add/remove meta boxes.
 		add_action( 'add_meta_boxes', array( $plugin, 'add_meta_boxes' ), 10, 2 );
 		add_action( 'admin_menu', array( $plugin, 'remove_meta_boxes' ) );
+		add_action( 'edit_form_after_title', array( $plugin, 'print_meta_boxes_after_title' ), 0 );
 
 		// Add instructions to thumbnail admin meta box.
 		add_filter( 'admin_post_thumbnail_html', array( $plugin, 'filter_admin_post_thumbnail_html' ), 100, 2 );
@@ -577,6 +578,16 @@ class WPCampus_Speakers_Admin {
 
 			case 'proposal':
 
+				// Print instructions.
+				add_meta_box(
+					'wpcampus-proposal-instructions',
+					sprintf( __( '%s: How To Manage Proposals', 'wpcampus' ), 'WPCampus' ),
+					array( $this, 'print_meta_boxes' ),
+					$post_type,
+					'wpc_after_title',
+					'high'
+				);
+
 				// WPCampus Speaker Information.
 				add_meta_box(
 					'wpcampus-speakers-details',
@@ -616,11 +627,26 @@ class WPCampus_Speakers_Admin {
 	}
 
 	/**
+	 * Print meta boxes after the title, before the editor.
+	 */
+	public function print_meta_boxes_after_title() {
+		global $post, $wp_meta_boxes;
+
+		do_meta_boxes( get_current_screen(), 'wpc_after_title', $post );
+
+		unset( $wp_meta_boxes['post']['wpc_after_title'] );
+	}
+
+	/**
 	 * Prints the content in our custom admin meta boxes.
 	 */
 	public function print_meta_boxes( $post, $metabox ) {
 
 		switch ( $metabox['id'] ) {
+
+			case 'wpcampus-proposal-instructions':
+				$this->print_proposal_instructions();
+				break;
 
 			case 'wpcampus-speakers-proposal':
 				$this->print_speaker_proposals_table( $post->ID );
@@ -634,6 +660,39 @@ class WPCampus_Speakers_Admin {
 				$this->print_proposal_submission_details( $post->ID );
 				break;
 		}
+	}
+
+	/**
+	 * Print instructions to manage proposals.
+	 */
+	public function print_proposal_instructions() {
+
+		$edit_url = admin_url( 'edit.php' );
+
+		$view_proposal_url = add_query_arg( 'post_type', 'proposal', $edit_url );
+		$view_profile_url  = add_query_arg( 'post_type', 'profile', $edit_url );
+
+		?>
+		<style type="text/css">
+			#wpcampus-proposal-instructions { margin: 15px 0 0px 0; }
+			#wpcampus-proposal-instructions ul { list-style: disc; margin: 0 0 0 20px; }
+			.wpc-inside-mb {
+				background: rgba(0,115,170,0.07);
+				padding: 18px;
+				color: #000;
+				margin: -6px -12px -12px -12px;
+			}
+		</style>
+		<div class="wpc-inside-mb">
+			<ul>
+				<li>All of our session information is managed on our main site as <a href="<?php echo $view_proposal_url; ?>" target="_blank">proposals</a> and <a href="<?php echo $view_profile_url; ?>" target="_blank">speaker profiles</a>.</li>
+				<li>Use "The Speaker(s)" meta box to select the <a href="<?php echo $view_profile_url; ?>" target="_blank">speaker profiles</a> for this proposal.</li>
+				<li>To make this proposal available for an event, select the event and mark the "Proposal Status" as "Confirmed".</li>
+				<li>When assigned to a session on an event website, the proposal information will auto-populate the schedule where needed, including speaker information.</li>
+				<li>When the session's video is available, you can assign it to the proposal in "The Asset(s)" meta box.</li>
+			</ul>
+		</div>
+		<?php
 	}
 
 	/**

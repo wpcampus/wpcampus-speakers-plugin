@@ -32,6 +32,9 @@ class WPCampus_Speakers_Admin {
 		add_action( 'manage_profile_posts_custom_column', array( $plugin, 'populate_profile_columns' ), 10, 2 );
 		add_action( 'manage_proposal_posts_custom_column', array( $plugin, 'populate_proposal_columns' ), 10, 2 );
 
+		// Disable months dropdown.
+		add_filter( 'disable_months_dropdown', array( $plugin, 'disable_months_dropdown' ), 100, 2 );
+
 		// Adds dropdown to filter the speaker status.
 		add_action( 'restrict_manage_posts', array( $plugin, 'add_proposal_filters' ), 100 );
 
@@ -397,6 +400,22 @@ class WPCampus_Speakers_Admin {
 				endif;
 				break;
 		}
+	}
+
+	/**
+	 * We can disable the months dropdown for posts table.
+	 *
+	 * @args    $disable - bool - Whether to disable the drop-down. Default false.
+	 * @args    $post_type - string - The post type.
+	 */
+	public function disable_months_dropdown( $disable, $post_type ) {
+
+		// Disable for specific post types.
+		if ( in_array( $post_type, array( 'profile', 'proposal' ) ) ) {
+			return true;
+		}
+
+		return $disable;
 	}
 
 	/**

@@ -515,7 +515,7 @@ class WPCampus_Speakers_Admin {
 			}
 		}
 
-		$selected_proposal_status = ! empty( $_GET['proposal_status'] ) ? $_GET['proposal_status'] : null;
+		$selected_proposal_status = ! empty( $_GET['proposal_status'] ) ? sanitize_text_field( $_GET['proposal_status'] ) : null;
 
 		?>
 		<select name="proposal_status">

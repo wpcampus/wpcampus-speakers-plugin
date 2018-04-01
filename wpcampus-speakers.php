@@ -197,6 +197,13 @@ final class WPCampus_Speakers {
 	}
 
 	/**
+	 * Get the slides URL for a proposal.
+	 */
+	public function get_session_slides_url( $post_id ) {
+		return get_post_meta( $post_id, 'session_slides_url', true );
+	}
+
+	/**
 	 * Get the speaker IDs for a proposal.
 	 *
 	 * @args    $proposal_id - int - the proposal ID.

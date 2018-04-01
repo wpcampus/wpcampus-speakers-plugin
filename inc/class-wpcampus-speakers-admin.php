@@ -724,7 +724,7 @@ class WPCampus_Speakers_Admin {
 		$profiles = ! empty( $args['profiles'] ) ? $args['profiles'] : array();
 		if ( ! empty( $profiles ) ) :
 			?>
-			<div style="background:rgba(0,115,170,0.07);padding:18px;color:#000;margin:-6px -12px -12px -12px;">
+			<div style="background:rgba(0,115,170,0.07);padding:13px 18px 15px;color:#000;margin:-6px -12px -12px -12px;">
 				<?php
 
 				foreach( $profiles as $profile_id ) :
@@ -733,7 +733,7 @@ class WPCampus_Speakers_Admin {
 					$display_name = get_post_meta( $profile_id, 'display_name', true );
 
 					?>
-					<a class="button button-primary button-large" style="display:block;text-align:center;" href="<?php echo $edit_url; ?>" target="_blank"><?php printf( __( 'Edit %s', 'wpcampus-speakers' ), $display_name ); ?></a>
+					<a class="button button-primary button-large" style="display:block;text-align:center;margin:5px 0;" href="<?php echo $edit_url; ?>" target="_blank"><?php printf( __( 'Edit %s', 'wpcampus-speakers' ), $display_name ); ?></a>
 					<?php
 				endforeach;
 

@@ -238,7 +238,7 @@ class WPCampus_Speakers_Admin {
 		return $this->add_admin_columns( $columns, array(
 			'proposal_status'  => __( 'Status', 'wpcampus' ),
 			'proposal_speaker' => __( 'Speaker(s)', 'wpcampus' ),
-			'proposal_video'   => __( 'Video', 'wpcampus' ),
+			'proposal_assets'  => __( 'Asset(s)', 'wpcampus' ),
 		));
 	}
 
@@ -400,21 +400,54 @@ class WPCampus_Speakers_Admin {
 				endif;
 				break;
 
-			case 'proposal_video':
+			case 'proposal_assets':
 
 				// Get the video.
-				$session_video_id = wpcampus_speakers()->get_session_video( $post_id );
+				$session_video_id  = wpcampus_speakers()->get_session_video( $post_id );
+				$session_video_url = wpcampus_speakers()->get_session_video_url( $post_id, $session_video_id );
 
-				if ( ! $session_video_id ) :
-					?><em><?php _e( 'No video', 'wpcampus' ); ?></em><?php
+				if ( empty( $session_video_id ) && empty( $session_video_url ) ) :
+					?>
+					<em><?php _e( 'No video', 'wpcampus' ); ?></em>
+					<?php
 				else :
 
-					// Get URLs.
-					$video_url = wpcampus_speakers()->get_session_video_url( $post_id, $session_video_id );
-					$edit_video_url = get_edit_post_link( $session_video_id );
+					if ( ! empty( $session_video_url ) ) :
+						?>
+						<a href="<?php echo $session_video_url; ?>" target="_blank"><?php _e( 'View video', 'wpcampus' ); ?></a>
+						<?php
+					endif;
 
-					?><a href="<?php echo $video_url; ?>" target="_blank"><?php _e( 'View video', 'wpcampus' ); ?></a> (<a href="<?php echo $edit_video_url; ?>"><?php _e( 'Edit', 'wpcampus' ); ?></a>)<?php
+					if ( ! empty( $session_video_id ) ) :
+
+						// Get URLs.
+						$edit_video_url = get_edit_post_link( $session_video_id );
+
+						if ( ! empty( $session_video_url ) ) {
+							echo '<br>';
+						}
+
+						?>
+					    <a href="<?php echo $edit_video_url; ?>" target="_blank"><?php _e( 'Edit video', 'wpcampus' ); ?></a>
+						<?php
+					endif;
 				endif;
+
+				echo '<br><br>';
+
+				// Get the slides.
+				$session_slides_url = wpcampus_speakers()->get_session_slides_url( $post_id );
+
+				if ( empty( $session_slides_url ) ) :
+					?>
+					<em><?php _e( 'No slides', 'wpcampus' ); ?></em>
+					<?php
+				else :
+					?>
+					<a href="<?php echo $session_slides_url; ?>" target="_blank"><?php _e( 'View slides', 'wpcampus' ); ?></a>
+					<?php
+				endif;
+
 				break;
 		}
 	}

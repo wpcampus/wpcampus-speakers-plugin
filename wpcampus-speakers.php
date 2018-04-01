@@ -157,43 +157,57 @@ final class WPCampus_Speakers {
 	}
 
 	/**
-	 * Build and return a video's YouTube
-	 * watch URL based on the video ID.
+	 * Get the URL for a video post.
 	 */
-	public function get_video_youtube_id( $video_post_id ) {
-		return get_post_meta( $video_post_id, 'wpc_youtube_video_id', true );
-	}
+	public function get_video_url( $post_id ) {
 
-	/**
-	 * Get the proposal's session video URL.
-	 */
-	public function get_session_video( $post_id ) {
-		return get_post_meta( $post_id, 'session_video', true );
-	}
-
-	/**
-	 * Get the proposal's session video URL.
-	 */
-	public function get_session_video_url( $post_id, $session_video_id = 0 ) {
-
-		// Get WPCampus video post ID.
-		if ( ! $session_video_id ) {
-			$session_video_id = $this->get_session_video( $post_id );
-
-			if ( ! $session_video_id ) {
-				return '';
-			}
-		}
-
-		// Get the YouTube ID.
-		$youtube_id = $this->get_video_youtube_id( $session_video_id );
-
+		// Get YouTube ID from the video post.
+		$youtube_id = $this->get_video_youtube_id( $post_id );
 		if ( empty( $youtube_id ) ) {
 			return '';
 		}
 
 		// Return the YouTube URL.
 		return $this->get_youtube_url( $youtube_id );
+	}
+
+	/**
+	 * Build and return a video's YouTube
+	 * watch URL based on the video ID.
+	 */
+	public function get_video_youtube_id( $post_id ) {
+		return get_post_meta( $post_id, 'wpc_youtube_video_id', true );
+	}
+
+	/**
+	 * Get the proposal's session video post ID.
+	 */
+	public function get_proposal_video_id( $post_id ) {
+		return get_post_meta( $post_id, 'session_video', true );
+	}
+
+	/**
+	 * Get the proposal's session video URL.
+	 */
+	public function get_proposal_video_url( $post_id, $proposal_video_id = null ) {
+
+		// If URL is hard-set, return first.
+		$video_url = get_post_meta( $post_id, 'session_video_url', true );
+		if ( ! empty( $video_url ) ) {
+			return $video_url;
+		}
+
+		// See if a video is assigned to the post.
+		if ( ! isset( $proposal_video_id ) ) {
+			$proposal_video_id  = $this->get_proposal_video_id( $post_id );
+		}
+
+		// This means its one of our video posts so get its URL.
+		if ( ! empty( $proposal_video_id ) ) {
+			return $this->get_video_url( $proposal_video_id );
+		}
+
+		return '';
 	}
 
 	/**

@@ -403,27 +403,27 @@ class WPCampus_Speakers_Admin {
 			case 'proposal_assets':
 
 				// Get the video.
-				$session_video_id  = wpcampus_speakers()->get_session_video( $post_id );
-				$session_video_url = wpcampus_speakers()->get_session_video_url( $post_id, $session_video_id );
+				$proposal_video_id  = wpcampus_speakers()->get_proposal_video_id( $post_id );
+				$proposal_video_url = wpcampus_speakers()->get_proposal_video_url( $post_id, $proposal_video_id );
 
-				if ( empty( $session_video_id ) && empty( $session_video_url ) ) :
+				if ( empty( $proposal_video_id ) && empty( $proposal_video_url ) ) :
 					?>
 					<em><?php _e( 'No video', 'wpcampus' ); ?></em>
 					<?php
 				else :
 
-					if ( ! empty( $session_video_url ) ) :
+					if ( ! empty( $proposal_video_url ) ) :
 						?>
-						<a href="<?php echo $session_video_url; ?>" target="_blank"><?php _e( 'View video', 'wpcampus' ); ?></a>
+						<a href="<?php echo $proposal_video_url; ?>" target="_blank"><?php _e( 'View video', 'wpcampus' ); ?></a>
 						<?php
 					endif;
 
-					if ( ! empty( $session_video_id ) ) :
+					if ( ! empty( $proposal_video_id ) ) :
 
 						// Get URLs.
-						$edit_video_url = get_edit_post_link( $session_video_id );
+						$edit_video_url = get_edit_post_link( $proposal_video_id );
 
-						if ( ! empty( $session_video_url ) ) {
+						if ( ! empty( $proposal_video_url ) ) {
 							echo '<br>';
 						}
 

@@ -30,4 +30,4 @@ gulp.task('watch',function() {
 });
 
 // Let's get this party started.
-gulp.task('default',['test','watch']);
+gulp.task('default',['test']);

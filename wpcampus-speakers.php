@@ -325,7 +325,7 @@ final class WPCampus_Speakers {
 	 */
 	public function create_proposal_confirmation_id( $proposal_id ) {
 		global $wpdb;
-		$new_id = $wpdb->get_var( "SELECT SUBSTRING(MD5(RAND()),16)" );
+		$new_id = $wpdb->get_var( 'SELECT SUBSTRING(MD5(RAND()),16)' );
 		if ( ! empty( $new_id ) ) {
 			update_post_meta( $proposal_id, 'proposal_confirmation_id', $new_id );
 		}

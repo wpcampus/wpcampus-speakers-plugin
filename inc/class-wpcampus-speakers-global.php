@@ -770,13 +770,13 @@ final class WPCampus_Speakers_Global {
 			|| ( is_array( $taxonomy ) && 1 == count( $taxonomy ) && $technical_tax == array_shift( $taxonomy ) ) ) {
 
 			// Only sort if WP_Term objects.
-			foreach( $terms as $term ) {
+			foreach ( $terms as $term ) {
 				if ( empty( $term->slug ) ) {
 					break;
 				}
 
 				// Sort "Beginner", "Intermediate" then "Advanced" as first terms.
-				usort( $terms, function( $a, $b ){
+				usort( $terms, function( $a, $b ) {
 					if ( $a->slug == $b->slug ) {
 						return 0;
 					}
@@ -789,7 +789,7 @@ final class WPCampus_Speakers_Global {
 					if ( 'intermediate' == $a->slug && 'beginner' != $b->slug ) {
 						return -1;
 					}
-					if ( 'advanced' == $a->slug && 'beginner' != $b->slug && 'intermediate' != $b->slug) {
+					if ( 'advanced' == $a->slug && 'beginner' != $b->slug && 'intermediate' != $b->slug ) {
 						return -1;
 					}
 					return strcmp( $a->name, $b->name );

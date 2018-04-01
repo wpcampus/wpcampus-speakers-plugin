@@ -371,7 +371,7 @@ class WPCampus_Speakers_Admin {
 
 					$speaker_count = 0;
 
-					foreach( $speaker_ids as $speaker_id ) :
+					foreach ( $speaker_ids as $speaker_id ) :
 
 						$speaker_id = ! empty( $speaker_id ) && is_numeric( $speaker_id ) ? (int) $speaker_id : 0;
 						if ( $speaker_id > 0 ) :
@@ -528,7 +528,7 @@ class WPCampus_Speakers_Admin {
 		);
 
 		if ( ! empty( $db_counts ) ) {
-			foreach( $db_counts as $count ) {
+			foreach ( $db_counts as $count ) {
 				if ( empty( $count->status ) ) {
 					continue;
 				}
@@ -760,7 +760,7 @@ class WPCampus_Speakers_Admin {
 			<div style="background:rgba(0,115,170,0.07);padding:13px 18px 15px;color:#000;margin:-6px -12px -12px -12px;">
 				<?php
 
-				foreach( $profiles as $profile_id ) :
+				foreach ( $profiles as $profile_id ) :
 
 					$edit_url = get_edit_post_link( $profile_id );
 					$display_name = get_post_meta( $profile_id, 'display_name', true );
@@ -877,7 +877,7 @@ class WPCampus_Speakers_Admin {
 
 								$speaker_count = 0;
 
-								foreach( $proposal_speaker_ids as $this_speaker_id ) :
+								foreach ( $proposal_speaker_ids as $this_speaker_id ) :
 
 									$this_speaker_id = ! empty( $this_speaker_id ) && is_numeric( $this_speaker_id ) ? (int) $this_speaker_id : 0;
 									if ( $this_speaker_id > 0 ) :
@@ -1031,7 +1031,7 @@ class WPCampus_Speakers_Admin {
 		// Create array for CSV.
 		$speakers_csv = array();
 
-		foreach( $speakers as $speaker ) {
+		foreach ( $speakers as $speaker ) {
 
 			// Will hold feedback URL(s).
 			$session_titles = array();
@@ -1045,7 +1045,7 @@ class WPCampus_Speakers_Admin {
 				$speaker_events = $the_speaker->get_events();
 				if ( ! empty( $speaker_events ) ) {
 
-					foreach( $speaker_events as $event ) {
+					foreach ( $speaker_events as $event ) {
 
 						// Add the title.
 						$session_titles[] = $event->post_title;

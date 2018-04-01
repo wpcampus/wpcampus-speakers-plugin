@@ -271,14 +271,23 @@ final class WPCampus_Speakers_Global {
 		}
 
 		// Get WPCampus video post ID.
-		$session_video_id = wpcampus_speakers()->get_session_video( $post->ID );
+		$proposal_video_id = wpcampus_speakers()->get_proposal_video_id( $post->ID );
 
 		// Get the YouTube ID.
-		$youtube_id = $session_video_id > 0 ? wpcampus_speakers()->get_video_youtube_id( $session_video_id ) : null;
+		$youtube_id = $proposal_video_id > 0 ? wpcampus_speakers()->get_video_youtube_id( $proposal_video_id ) : null;
 
 		// Store the YouTube ID and URL.
 		$response->data['session_video'] = ! empty( $youtube_id ) ? $youtube_id : null;
-		$response->data['session_video_url'] = ! empty( $youtube_id ) ? wpcampus_speakers()->get_youtube_url( $youtube_id ) : null;
+
+		// Store the video URL.
+		$proposal_video_url = wpcampus_speakers()->get_proposal_video_url( $post->ID );
+
+		// Store the video URL.
+		$response->data['session_video_url'] = ! empty( $proposal_video_url ) ? $proposal_video_url : null;
+
+		// Store the slides URL.
+		$slides_url = wpcampus_speakers()->get_session_slides_url( $post->ID );
+		$response->data['session_slides_url'] = ! empty( $slides_url ) ? $slides_url : null;
 
 		return $response;
 	}

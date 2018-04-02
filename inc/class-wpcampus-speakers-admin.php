@@ -436,7 +436,7 @@ class WPCampus_Speakers_Admin {
 				echo '<br><br>';
 
 				// Get the slides.
-				$session_slides_url = wpcampus_speakers()->get_session_slides_url( $post_id );
+				$session_slides_url = wpcampus_speakers()->get_proposal_slides_url( $post_id );
 
 				if ( empty( $session_slides_url ) ) :
 					?>

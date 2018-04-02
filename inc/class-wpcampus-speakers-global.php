@@ -286,7 +286,7 @@ final class WPCampus_Speakers_Global {
 		$response->data['session_video_url'] = ! empty( $proposal_video_url ) ? $proposal_video_url : null;
 
 		// Store the slides URL.
-		$slides_url = wpcampus_speakers()->get_session_slides_url( $post->ID );
+		$slides_url = wpcampus_speakers()->get_proposal_slides_url( $post->ID );
 		$response->data['session_slides_url'] = ! empty( $slides_url ) ? $slides_url : null;
 
 		return $response;

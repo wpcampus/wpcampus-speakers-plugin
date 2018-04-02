@@ -38,6 +38,9 @@ class WPCampus_Speakers_Admin {
 		// Adds dropdown to filter the speaker status.
 		add_action( 'restrict_manage_posts', array( $plugin, 'add_proposal_filters' ), 100 );
 
+		// Filter post row actions.
+		add_filter( 'post_row_actions', array( $plugin, 'filter_post_row_actions' ), 10, 2 );
+
 		// Add/remove meta boxes.
 		add_action( 'add_meta_boxes', array( $plugin, 'add_meta_boxes' ), 10, 2 );
 		add_action( 'admin_menu', array( $plugin, 'remove_meta_boxes' ) );
@@ -492,6 +495,38 @@ class WPCampus_Speakers_Admin {
 	}
 
 	/**
+	 * Filter the post row actions.
+	 */
+	public function filter_post_row_actions( $actions, $post ) {
+
+		// Only for proposals.
+		if ( 'proposal' != $post->post_type ) {
+			return $actions;
+		}
+
+		// @TODO: Only add for confirmed proposals who have been selected?
+		$proposal_status = wpcampus_speakers()->get_proposal_status( $post->ID );
+		if ( 'confirmed' != $proposal_status ) {
+			return $actions;
+		}
+
+		// Only for proposals assigned to an event.
+		$events = wp_get_object_terms( $post->ID, 'proposal_event', array( 'fields' => 'ids' ) );
+		if ( empty( $events ) ) {
+			return $actions;
+		}
+
+		$permalink = wpcampus_speakers()->get_session_permalink( $post->ID );
+		if ( empty( $permalink ) ) {
+			return $actions;
+		}
+
+		$actions['view'] = '<a href="' . $permalink . '" target="_blank">' . __( 'View', 'wpcampus' ) . '</a>';
+
+		return $actions;
+	}
+
+	/**
 	 * Add the proposal status filter.
 	 *
 	 * @args    $post_status - string - the current post status.
@@ -770,6 +805,7 @@ class WPCampus_Speakers_Admin {
 
 		?>
 		<style type="text/css">
+			#wpcampus-proposal-slug { margin: 15px 0 0px 0; }
 			#post_name { min-width: 300px; }
 		</style>
 		<?php

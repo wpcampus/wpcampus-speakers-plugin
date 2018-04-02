@@ -148,6 +148,16 @@ final class WPCampus_Speakers {
 	}
 
 	/**
+	 * Build/return a proposal's session permalink.
+	 */
+	public function get_session_permalink( $post_id ) {
+		if ( 'proposal' != get_post_type( $post_id ) ) {
+			return '';
+		}
+		return get_bloginfo( 'url' ) . '/session/' . get_post_field( 'post_name', $post_id );
+	}
+
+	/**
 	 * Build and return a video's YouTube
 	 * watch URL based on the video ID.
 	 */

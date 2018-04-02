@@ -611,6 +611,15 @@ class WPCampus_Speakers_Admin {
 
 			case 'proposal':
 
+				add_meta_box(
+					'wpcampus-proposal-slug',
+					sprintf( __( '%s: Session URL Slug', 'wpcampus' ), 'WPCampus' ),
+					array( $this, 'print_meta_boxes' ),
+					$post_type,
+					'wpc_after_title',
+					'high'
+				);
+
 				// Print instructions.
 				add_meta_box(
 					'wpcampus-proposal-instructions',
@@ -669,8 +678,10 @@ class WPCampus_Speakers_Admin {
 		// We use ACF to manage events.
 		remove_meta_box( 'tagsdiv-proposal_event', 'proposal', 'side' );
 
-		// Help clean up the admin.
+		// We don't need the profile slug.
 		remove_meta_box( 'slugdiv', 'profile', 'normal' );
+
+		// We add our own.
 		remove_meta_box( 'slugdiv', 'proposal', 'normal' );
 
 	}
@@ -695,6 +706,10 @@ class WPCampus_Speakers_Admin {
 
 			case 'wpcampus-proposal-instructions':
 				$this->print_proposal_instructions();
+				break;
+
+			case 'wpcampus-proposal-slug':
+				$this->print_proposal_slug_mb( $post );
 				break;
 
 			case 'wpcampus-edit-profiles':
@@ -746,6 +761,23 @@ class WPCampus_Speakers_Admin {
 			</ul>
 		</div>
 		<?php
+	}
+
+	/**
+	 * Add our own metabox to manage the proposal slug.
+	 */
+	public function print_proposal_slug_mb( $post ) {
+
+		?>
+		<style type="text/css">
+			#post_name { min-width: 300px; }
+		</style>
+		<?php
+
+		echo get_bloginfo( 'url' ) . '/session/ ';
+
+		post_slug_meta_box( $post );
+
 	}
 
 	/**

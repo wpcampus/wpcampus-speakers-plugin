@@ -766,37 +766,42 @@ final class WPCampus_Speakers_Global {
 
 		// Filter technical levels to be in a specific order.
 		$technical_tax = 'session_technical';
-		if ( $technical_tax == $taxonomy
-			|| ( is_array( $taxonomy ) && 1 == count( $taxonomy ) && $technical_tax == array_shift( $taxonomy ) ) ) {
 
-			// Only sort if WP_Term objects.
-			foreach ( $terms as $term ) {
-				if ( empty( $term->slug ) ) {
-					break;
-				}
+		if ( is_array( $taxonomy ) ) {
+			$taxonomy = array_shift( $taxonomy );
+		}
 
-				// Sort "Beginner", "Intermediate" then "Advanced" as first terms.
-				usort( $terms, function( $a, $b ) {
-					if ( $a->slug == $b->slug ) {
-						return 0;
-					}
-					if ( 'beginner' == $a->slug ) {
-						return -1;
-					}
-					if ( 'beginner' == $b->slug ) {
-						return 1;
-					}
-					if ( 'intermediate' == $a->slug && 'beginner' != $b->slug ) {
-						return -1;
-					}
-					if ( 'advanced' == $a->slug && 'beginner' != $b->slug && 'intermediate' != $b->slug ) {
-						return -1;
-					}
-					return strcmp( $a->name, $b->name );
-				});
+		if ( $technical_tax != $taxonomy ) {
+			return $terms;
+		}
 
+		// Only sort if WP_Term objects.
+		foreach ( $terms as $term ) {
+			if ( empty( $term->slug ) ) {
 				break;
 			}
+
+			// Sort "Beginner", "Intermediate" then "Advanced" as first terms.
+			usort( $terms, function( $a, $b ) {
+				if ( $a->slug == $b->slug ) {
+					return 0;
+				}
+				if ( 'beginner' == $a->slug ) {
+					return -1;
+				}
+				if ( 'beginner' == $b->slug ) {
+					return 1;
+				}
+				if ( 'intermediate' == $a->slug && 'beginner' != $b->slug ) {
+					return -1;
+				}
+				if ( 'advanced' == $a->slug && 'beginner' != $b->slug && 'intermediate' != $b->slug ) {
+					return -1;
+				}
+				return strcmp( $a->name, $b->name );
+			});
+
+			break;
 		}
 
 		return $terms;

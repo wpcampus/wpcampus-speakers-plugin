@@ -52,6 +52,9 @@ final class WPCampus_Speakers_Global {
 		// Add rewrite rules.
 		//add_action( 'init', array( $plugin, 'add_rewrite_rules' ) );
 
+		// Filter the permalink.
+		add_filter( 'post_type_link', array( $plugin, 'filter_permalink' ), 100, 2 );
+
 	}
 
 	/**
@@ -814,6 +817,21 @@ final class WPCampus_Speakers_Global {
 		add_rewrite_tag( '%session%', '([^&]+)' );
 		add_rewrite_rule( '^session/([^\/\s]+)/?', 'index.php?session=$matches[1]', 'top' );
 		//add_rewrite_rule('^leaf/([0-9]+)/?', 'index.php?page_id=$matches[1]', 'top');
+
+	/**
+	 * Filter permalink(s).
+	 *
+	 * @access  public
+	 * @param   $post_link - string - The post's permalink.
+	 * @param   $post - WP_Post - The post in question.
+	 * @return  string - the filtered permalink.
+	 */
+	public function filter_permalink( $post_link, $post ) {
+		if ( 'proposal' != $post->post_type ) {
+			return $post_link;
+		}
+		return wpcampus_speakers()->get_session_permalink( $post->ID );
+	}
 	}
 }
 WPCampus_Speakers_Global::register();

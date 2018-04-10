@@ -49,6 +49,10 @@ final class WPCampus_Speakers_Global {
 		// Filter terms when retrieved.
 		add_filter( 'get_terms', array( $plugin, 'filter_get_terms' ), 10, 4 );
 
+		// Manage comments.
+		add_filter( 'wpcampus_show_comments', array( $plugin, 'filter_show_comments' ) );
+		add_filter( 'comments_open', array( $plugin, 'filter_comments_open' ), 100, 2 );
+
 		// Add rewrite rules and tags.
 		add_action( 'init', array( $plugin, 'add_rewrite_rules_tags' ) );
 
@@ -808,6 +812,33 @@ final class WPCampus_Speakers_Global {
 		}
 
 		return $terms;
+	}
+
+	/**
+	 * Filter from main WPCampus theme to
+	 * decided whether or not to show comments.
+	 */
+	public function filter_show_comments( $show ) {
+		if ( is_singular( 'proposal' ) ) {
+			if ( current_user_can( 'review_wpc_proposals' ) ) {
+				return true;
+			}
+			return false;
+		}
+		return $show;
+	}
+
+	/**
+	 * Filter whether or not comments are open for proposals.
+	 */
+	public function filter_comments_open( $open, $post_id ) {
+		if ( 'proposal' == get_post_type( $post_id ) ) {
+			if ( current_user_can( 'review_wpc_proposals' ) ) {
+				return true;
+			}
+			return false;
+		}
+		return $open;
 	}
 
 	/**

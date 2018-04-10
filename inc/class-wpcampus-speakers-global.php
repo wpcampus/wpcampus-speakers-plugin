@@ -49,8 +49,8 @@ final class WPCampus_Speakers_Global {
 		// Filter terms when retrieved.
 		add_filter( 'get_terms', array( $plugin, 'filter_get_terms' ), 10, 4 );
 
-		// Add rewrite rules.
-		//add_action( 'init', array( $plugin, 'add_rewrite_rules' ) );
+		// Add rewrite rules and tags.
+		add_action( 'init', array( $plugin, 'add_rewrite_rules_tags' ) );
 
 		// Filter the permalink.
 		add_filter( 'post_type_link', array( $plugin, 'filter_permalink' ), 100, 2 );
@@ -813,10 +813,10 @@ final class WPCampus_Speakers_Global {
 	/**
 	 * Add rewrite rules.
 	 */
-	public function add_rewrite_rules() {
-		add_rewrite_tag( '%session%', '([^&]+)' );
-		add_rewrite_rule( '^session/([^\/\s]+)/?', 'index.php?session=$matches[1]', 'top' );
-		//add_rewrite_rule('^leaf/([0-9]+)/?', 'index.php?page_id=$matches[1]', 'top');
+	public function add_rewrite_rules_tags() {
+		add_rewrite_tag( '%wpc_session%', '([^&]+)' );
+		add_rewrite_rule( '^session/([^\/\s]+)/?', 'index.php?wpc_session=$matches[1]', 'top' );
+	}
 
 	/**
 	 * Filter permalink(s).

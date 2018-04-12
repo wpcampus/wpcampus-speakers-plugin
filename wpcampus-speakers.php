@@ -43,13 +43,6 @@ if ( is_admin() ) {
 final class WPCampus_Speakers {
 
 	/**
-	 * Holds the plugin version.
-	 *
-	 * @var     string
-	 */
-	private $version = '1.0.0';
-
-	/**
 	 * Holds the absolute URL to
 	 * the main plugin directory.
 	 *
@@ -116,15 +109,6 @@ final class WPCampus_Speakers {
 		$this->plugin_url = plugin_dir_url( __FILE__ );
 		$this->plugin_dir = plugin_dir_path( __FILE__ );
 
-	}
-
-	/**
-	 * Returns the plugin version.
-	 *
-	 * @return  string
-	 */
-	public function get_version() {
-		return $this->version;
 	}
 
 	/**

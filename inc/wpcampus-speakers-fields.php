@@ -90,6 +90,26 @@ function wpcampus_speakers_add_fields() {
 					'layout' => 'vertical',
 					'return_format' => 'value',
 				),
+				array(
+					'key' => 'field_5a32bf3a2ef2d',
+					'label' => __( 'Selection Status', 'wpcampus-speakers' ),
+					'name' => 'selection_status',
+					'type' => 'radio',
+					'required' => 1,
+					'conditional_logic' => 0,
+					'choices' => array(
+						'yes' => __( 'Yes', 'wpcampus-speakers' ),
+						'backup' => __( 'Backup', 'wpcampus-speakers' ),
+						'maybe' => __( 'Maybe', 'wpcampus-speakers' ),
+						'no' => __( 'No', 'wpcampus-speakers' ),
+					),
+					'allow_null' => 1,
+					'other_choice' => 0,
+					'save_other_choice' => 0,
+					'default_value' => 'no',
+					'layout' => 'horizontal',
+					'return_format' => 'value',
+				),
 			),
 			'location' => array(
 				array(

@@ -132,6 +132,29 @@ final class WPCampus_Speakers {
 	}
 
 	/**
+	 * Properly strip HTML tags including script and style.
+	 *
+	 * Adapted from wp_strip_all_tags().
+	 *
+	 * @param   $string - string - String containing HTML tags.
+	 * @param   $allowed_tags - string - the tags we don't want to strip.
+	 * @return  string - The processed string.
+	 */
+	public function strip_content_tags( $string, $allowed_tags = '<a><ul><ol><li><em><strong>' ) {
+
+		// Remove <script> and <style> tags.
+		$string = preg_replace( '@<(script|style)[^>]*?>.*?</\\1>@si', '', $string );
+
+		// Remove all but allowed tags.
+		$string = strip_tags( $string, $allowed_tags );
+
+		// Remove line breaks.
+		$string = preg_replace( '/[\r\n\t ]+/', ' ', $string );
+
+		return trim( $string );
+	}
+
+	/**
 	 * Build/return a proposal's session permalink.
 	 */
 	public function get_session_permalink( $post_id ) {
@@ -356,29 +379,6 @@ final class WPCampus_Speakers {
 			//'session' => $event->ID,
 			'c'         => $proposal_confirmation_id,
 		), get_bloginfo( 'url' ) . '/speaker-confirmation/' );
-	}
-
-	/**
-	 * Properly strip HTML tags including script and style.
-	 *
-	 * Adapted from wp_strip_all_tags().
-	 *
-	 * @param   $string - string - String containing HTML tags.
-	 * @param   $allowed_tags - string - the tags we don't want to strip.
-	 * @return  string - The processed string.
-	 */
-	public function strip_content_tags( $string, $allowed_tags = '<a><ul><ol><li><em><strong>' ) {
-
-		// Remove <script> and <style> tags.
-		$string = preg_replace( '@<(script|style)[^>]*?>.*?</\\1>@si', '', $string );
-
-		// Remove all but allowed tags.
-		$string = strip_tags( $string, $allowed_tags );
-
-		// Remove line breaks.
-		$string = preg_replace( '/[\r\n\t ]+/', ' ', $string );
-
-		return trim( $string );
 	}
 }
 

@@ -71,8 +71,8 @@ function wpcampus_speakers_add_fields() {
 				),
 				array(
 					'key' => 'field_5a34bf2121f2d',
-					'label' => __( 'Proposal Status', 'wpcampus-speakers' ),
-					'name' => 'proposal_status',
+					'label' => __( 'Event Status', 'wpcampus-speakers' ),
+					'name' => 'proposal_status', // TODO: Change to "event_status"?
 					'type' => 'radio',
 					'instructions' => '',
 					'required' => 1,
@@ -87,7 +87,7 @@ function wpcampus_speakers_add_fields() {
 					'other_choice' => 0,
 					'save_other_choice' => 0,
 					'default_value' => 'submitted',
-					'layout' => 'vertical',
+					'layout' => 'horizontal',
 					'return_format' => 'value',
 				),
 				array(

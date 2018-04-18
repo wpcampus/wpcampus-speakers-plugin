@@ -161,7 +161,7 @@ final class WPCampus_Speakers {
 		if ( 'proposal' != get_post_type( $post_id ) ) {
 			return '';
 		}
-		return get_bloginfo( 'url' ) . '/session/' . get_post_field( 'post_name', $post_id );
+		return get_bloginfo( 'url' ) . '/session/' . get_post_field( 'post_name', $post_id ) . '/';
 	}
 
 	/**

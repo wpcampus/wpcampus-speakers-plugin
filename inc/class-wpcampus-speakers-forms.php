@@ -11,6 +11,9 @@
  */
 final class WPCampus_Speakers_Forms {
 
+	// If true, will update info from speaker confirmations.
+	private $enable_speaker_confirmation_update;
+
 	/**
 	 * We don't need to instantiate this class.
 	 */
@@ -26,33 +29,68 @@ final class WPCampus_Speakers_Forms {
 		add_filter( 'gform_field_value', array( $plugin, 'filter_field_value' ), 10, 3 );
 
 		// Populate field choices.
-		//add_filter( 'gform_pre_render', array( $plugin, 'populate_field_choices' ) );
-		//add_filter( 'gform_pre_validation', array( $plugin, 'populate_field_choices' ) );
-		//add_filter( 'gform_pre_submission_filter', array( $plugin, 'populate_field_choices' ) );
-		//add_filter( 'gform_admin_pre_render', array( $plugin, 'populate_field_choices' ) );
+		add_filter( 'gform_pre_render', array( $plugin, 'populate_field_choices' ), 100 );
+		add_filter( 'gform_pre_validation', array( $plugin, 'populate_field_choices' ), 100 );
+		add_filter( 'gform_pre_submission_filter', array( $plugin, 'populate_field_choices' ), 100 );
+		add_filter( 'gform_admin_pre_render', array( $plugin, 'populate_field_choices' ), 100 );
 
-		// Populate the session survey form.
-		//add_filter( 'gform_pre_render_9', array( $this, 'populate_session_survey_form' ) );
-		//add_filter( 'gform_pre_validation_9', array( $this, 'populate_session_survey_form' ) );
-		//add_filter( 'gform_admin_pre_render_9', array( $this, 'populate_session_survey_form' ) );
-		//add_filter( 'gform_pre_submission_filter_9', array( $this, 'populate_session_survey_form' ) );
+		// Load ACF field choices.
+		add_filter( 'acf/load_field/name=wpc_speaker_app_form_id', array( $plugin, 'load_gravity_form_field_choices' ) );
+		add_filter( 'acf/load_field/name=wpc_speaker_confirmation_form_id', array( $plugin, 'load_gravity_form_field_choices' ) );
 
-		// Process 2018 speaker application.
-		add_action( 'gform_after_submission_30', array( $plugin, 'process_2018_speaker_application' ), 10, 2 );
+		// Process speaker application.
+		$speaker_app_id = wpcampus_speakers()->get_speaker_app_form_id();
+		if ( $speaker_app_id > 0 ) {
+			add_action( 'gform_after_submission_' . $speaker_app_id, array( $plugin, 'process_speaker_application' ), 10, 2 );
+		}
+
+		// Process the speaker applications.
+		add_action( 'current_screen', array( $plugin, 'process_speaker_applications' ) );
 
 		// Process speaker confirmation.
-		//add_filter( 'gform_get_form_filter_5', array( $plugin, 'filter_online_speaker_confirmation_form' ), 100, 2 );
-		//add_filter( 'gform_get_form_filter_8', array( $plugin, 'filter_2017_speaker_confirmation_form' ), 100, 2 );
-		//add_action( 'gform_after_submission_8', array( $plugin, 'process_2017_speaker_confirmation' ), 10, 2 );
+		$speaker_confirmation_form_id = wpcampus_speakers()->get_speaker_confirmation_form_id();
+		if ( $speaker_confirmation_form_id > 0 ) {
+			//add_filter( 'gform_get_form_filter_5', array( $plugin, 'filter_online_speaker_confirmation_form' ), 100, 2 );
+			add_filter( 'gform_get_form_filter_' . $speaker_confirmation_form_id, array( $plugin, 'filter_speaker_confirmation_form' ), 100, 2 );
+			add_action( 'gform_after_submission_' . $speaker_confirmation_form_id, array( $plugin, 'process_speaker_confirmation' ), 10, 2 );
+		}
+
+		add_action( 'current_screen', array( $plugin, 'update_proposals_from_speaker_confirmations' ) );
 
 		// Process 2017 speaker questionnaire.
 		//add_filter( 'gform_get_form_filter_13', array( $plugin, 'filter_2017_speaker_questionnaire' ), 100, 2 );
 		//add_action( 'gform_after_submission_13', array( $plugin, 'process_2017_speaker_questionnaire' ), 10, 2 );
 
-		// Manually update session information from speaker confirmations.
-		// TODO: Setup to run when form is submitted.
-		//add_action( 'admin_init', array( $this, 'update_sessions_from_speaker_confirmations' ) );
+	}
 
+	/**
+	 * @return bool
+	 */
+	public function load_gravity_form_field_choices( $field ) {
+
+		// Reset choices.
+		$field['choices'] = array();
+
+		// Get list of forms.
+		$forms = wpcampus_speakers()->get_gravity_forms();
+
+		if ( empty( $forms ) ) {
+			return $field;
+		}
+
+		foreach ( $forms as $form ) {
+			$field['choices'][ $form['id'] ] = $form['title'];
+		}
+
+		return $field;
+	}
+
+	public function is_enable_speaker_confirmation_update() {
+		if ( isset( $this->enable_speaker_confirmation_update ) ) {
+			return $this->enable_speaker_confirmation_update;
+		}
+		$this->enable_speaker_confirmation_update = (bool) get_option( 'wpc_enable_speaker_confirmation_update' );
+		return $this->enable_speaker_confirmation_update;
 	}
 
 	/**
@@ -153,35 +191,6 @@ final class WPCampus_Speakers_Forms {
 	}
 
 	/**
-	 * Does this speaker have a partner?
-	 * Returns the primary speaker ID. They will
-	 * be the only speaker who can edit the
-	 * session information.
-	 *
-	 * @TODO:
-	 *  - Get to work with new system.
-	 */
-	public function get_form_session_primary_speaker( $session_id ) {
-		global $wpdb;
-
-		// Make sure we have a session ID.
-		if ( ! $session_id ) {
-			$session_id = $this->get_form_speaker_id();
-		}
-
-		if ( ! $session_id ) {
-			return 0;
-		}
-
-		$primary_speaker_id = $wpdb->get_var( $wpdb->prepare( "SELECT speakers.ID FROM {$wpdb->posts} speakers
-			INNER JOIN {$wpdb->postmeta} meta ON meta.meta_value = speakers.ID AND meta.meta_key = 'conf_sch_event_speaker' AND meta.post_id = %s
-			INNER JOIN {$wpdb->posts} schedule ON schedule.ID = meta.post_id AND schedule.post_type = 'profile'
-			WHERE speakers.post_type = 'speakers' ORDER BY speakers.ID ASC LIMIT 1", $session_id ) );
-
-		return $primary_speaker_id > 0 ? $primary_speaker_id : 0;
-	}
-
-	/**
 	 * Check the confirmation ID for a speaker.
 	 *
 	 * @TODO:
@@ -205,7 +214,7 @@ final class WPCampus_Speakers_Forms {
 		}
 
 		// Get speaker's confirmation id.
-		$speaker_confirmation_id = wpcampus_speakers()->get_proposal_confirmation_id( $speaker_id );
+		$speaker_confirmation_id = wpcampus_speakers()->get_confirmation_id( $speaker_id );
 
 		return $form_confirmation_id === $speaker_confirmation_id;
 	}
@@ -214,89 +223,67 @@ final class WPCampus_Speakers_Forms {
 	 * Filter field values.
 	 */
 	public function filter_field_value( $value, $field, $name ) {
-
-		//$is_2017_speaker_form = ( 7 == $blog_id && in_array( $field->formId, array( 8, 13 ) ) );
-
-		// Get the speaker and session ID.
-		//$speaker_id = $this->get_form_speaker_id();
-		//$session_id = $this->get_form_session_id();
-
-		// Get the speaker and session post.
-		//$speaker_post = $speaker_id > 0 ? $this->get_form_speaker_post( $speaker_id ) : null;
-		//$session_post = $session_id > 0 ? $this->get_form_session_post( $session_id ) : null;
+		global $wpc_proposal, $wpc_profile;
 
 		switch ( $name ) {
-
-			//case 'speaker_primary':
-			//	return $session_id ? $this->get_form_session_primary_speaker( $session_id ) : null;
-
-			//case 'speaker_name':
-			//	return ! empty( $speaker_post->post_title ) ? $speaker_post->post_title : null;
-
-			//case 'speaker_bio':
-			//	return ! empty( $speaker_post->post_content ) ? $speaker_post->post_content : null;
-
-			//case 'speaker_email':
-			//	return $speaker_id ? get_post_meta( $speaker_id, 'conf_sch_speaker_email', true ) : null;
-
-			//case 'speaker_website':
-			//	return $speaker_id ? get_post_meta( $speaker_id, 'conf_sch_speaker_url', true ) : null;
-
-			//case 'speaker_company':
-			//	return $speaker_id ? get_post_meta( $speaker_id, 'conf_sch_speaker_company', true ) : null;
-
-			//case 'speaker_company_website':
-			//	return $speaker_id ? get_post_meta( $speaker_id, 'conf_sch_speaker_company_url', true ) : null;
-
-			//case 'speaker_position':
-			//	return $speaker_id ? get_post_meta( $speaker_id, 'conf_sch_speaker_position', true ) : null;
-
-			//case 'speaker_twitter':
-			//	return $speaker_id ? get_post_meta( $speaker_id, 'conf_sch_speaker_twitter', true ) : null;
-
-			//case 'speaker_linkedin':
-			//	return $speaker_id ? get_post_meta( $speaker_id, 'conf_sch_speaker_linkedin', true ) : null;
-
-			//case 'session_title':
-			//	return ! empty( $session_post->post_title ) ? $session_post->post_title : null;
-
-			//case 'session_desc':
-			//	return ! empty( $session_post->post_content ) ? $session_post->post_content : null;
-
-			// Get user information.
-			case 'speaker_first_name':
-			case 'speaker_last_name':
-			case 'speaker_email':
-			case 'speaker_website':
-				$current_user = wp_get_current_user();
-
-				// Return the user data.
-				if ( 'speaker_first_name' == $name && ! empty( $current_user->user_firstname ) ) {
-					return $current_user->user_firstname;
-				}
-
-				if ( 'speaker_last_name' == $name && ! empty( $current_user->user_lastname ) ) {
-					return $current_user->user_lastname;
-				}
-
-				if ( 'speaker_email' == $name && ! empty( $current_user->user_email ) ) {
-					return $current_user->user_email;
-				}
-
-				if ( 'speaker_website' == $name && ! empty( $current_user->user_url ) ) {
-					return $current_user->user_url;
-				}
-
-				break;
-
-			// Get user meta.
-			case 'speaker_twitter':
-				return get_user_meta( get_current_user_id(), 'twitter', true );
 
 			// Populate the current user ID.
 			case 'userid':
 			case 'user_id':
 				return get_current_user_id();
+
+			// Populate proposal info.
+			case 'proposal_id':
+				return ! empty( $wpc_proposal->ID ) ? $wpc_proposal->ID : '';
+
+			case 'proposal_primary_speaker':
+				return ! empty( $wpc_proposal->ID ) ? wpcampus_speakers()->get_proposal_primary_speaker( $wpc_proposal->ID ) : null;
+
+			case 'proposal_title':
+				return ! empty( $wpc_proposal->title ) ? $wpc_proposal->title : '';
+
+			case 'proposal_content':
+				return ! empty( $wpc_proposal->content['rendered'] ) ? $wpc_proposal->content['rendered'] : '';
+
+			// Populate profile info.
+			case 'profile_id':
+				return ! empty( $wpc_profile->ID ) ? $wpc_profile->ID : '';
+
+			case 'profile_first_name':
+				return ! empty( $wpc_profile->first_name ) ? $wpc_profile->first_name : '';
+
+			case 'profile_last_name':
+				return ! empty( $wpc_profile->last_name ) ? $wpc_profile->last_name : '';
+
+			case 'profile_display_name':
+				return ! empty( $wpc_profile->display_name ) ? $wpc_profile->display_name : '';
+
+			case 'profile_email':
+				return ! empty( $wpc_profile->email ) ? $wpc_profile->email : '';
+
+			case 'profile_phone':
+				return ! empty( $wpc_profile->phone ) ? $wpc_profile->phone : '';
+
+			case 'profile_website':
+				return ! empty( $wpc_profile->website ) ? $wpc_profile->website : '';
+
+			case 'profile_content':
+				return ! empty( $wpc_profile->content['rendered'] ) ? $wpc_profile->content['rendered'] : '';
+
+			case 'profile_company':
+				return ! empty( $wpc_profile->company ) ? $wpc_profile->company : '';
+
+			case 'profile_company_website':
+				return ! empty( $wpc_profile->company_website ) ? $wpc_profile->company_website : '';
+
+			case 'profile_company_position':
+				return ! empty( $wpc_profile->company_position ) ? $wpc_profile->company_position : '';
+
+			case 'profile_twitter':
+				return ! empty( $wpc_profile->twitter ) ? $wpc_profile->twitter : '';
+
+			case 'profile_linkedin':
+				return ! empty( $wpc_profile->linkedin ) ? $wpc_profile->linkedin : '';
 
 		}
 
@@ -307,17 +294,10 @@ final class WPCampus_Speakers_Forms {
 	 * Dynamically populate field choices.
 	 */
 	public function populate_field_choices( $form ) {
+		global $wpc_proposal, $wpc_profile;
 
-		return $form;
-
-		//$is_2017_speaker_form = ( 7 == $blog_id && in_array( $form['id'], array( 8, 13 ) ) );
-
-		// Get the speaker and session ID.
-		//$speaker_id = $this->get_form_speaker_id();
-		//$session_id = $this->get_form_session_id();
-
-		// Get the session's speakers.
-		//$session_speakers = $this->get_form_session_speakers( $session_id );
+		// If logged in, see if have a speaker profile.
+		$wp_user = is_user_logged_in() ? wp_get_current_user() : null;
 
 		/*
 		 * Does this speaker have a partner?
@@ -327,109 +307,175 @@ final class WPCampus_Speakers_Forms {
 		 *
 		 * If so, disable all session edit fields.
 		 */
-		//$session_primary_speaker = $session_id > 0 ? $this->get_form_session_primary_speaker( $session_id ) : 0;
+		$proposal_primary_speaker = ! empty( $wpc_proposal->ID ) ? wpcampus_speakers()->get_proposal_primary_speaker( $wpc_proposal->ID ) : null;
 
 		foreach ( $form['fields'] as &$field ) {
 
 			// Hide this message for single or primary speakers.
-			/*if ( 'Session Edit Message' == $field->label && ! is_admin() ) {
+			if ( 'Session Edit Message' == $field->label && ! is_admin() ) {
 
-				if ( count( $session_speakers ) < 2 ) {
+				if ( empty( $wpc_proposal->speakers ) || count( $wpc_proposal->speakers ) < 2 ) {
 					$field->type = 'hidden';
 					$field->visibility = 'hidden';
-				} else {
+				} elseif ( $proposal_primary_speaker > 0 ) {
 
-					// Get the primary speaker title.
-					$session_primary_speaker_title = get_post_field( 'post_title', $session_primary_speaker );
+					if ( ! empty( $wpc_profile->ID ) && $proposal_primary_speaker == $wpc_profile->ID ) {
+						$field->content .= '<p><em><strong>You have the ability to edit your session information.</strong></em></p>';
+					} else {
 
-					// Edit the content.
-					$field->content .= '<p><em><strong>' . ( ( $session_primary_speaker == $speaker_id ) ? 'You have' : ( $session_primary_speaker_title . ' has' ) ) . ' the ability to edit your session information.</strong></em></p>';
+						$proposal_primary_speaker_title = '';
+						foreach ( $wpc_proposal->speakers as $speaker ) {
+							if ( $speaker->ID == $proposal_primary_speaker ) {
+								$proposal_primary_speaker_title = $speaker->title;
+							}
+						}
 
+						// Edit the content.
+						if ( ! empty( $proposal_primary_speaker_title ) ) {
+							$field->content .= '<p><em><strong>' . $proposal_primary_speaker_title . ' has the ability to edit your session information.</strong></em></p>';
+						}
+					}
 				}
 
 				// Wrap the content
-				$field->content = '<div class="callout">' . $field->content . '</div>';
+				$field->content = '<div class="panel blue">' . $field->content . '</div>';
 
-			}*/
+			}
 
 			switch ( $field->inputName ) {
 
 				// Hide if multiple speakers.
-				case 'session_desc':
-				case 'session_title':
-					/*if ( $session_primary_speaker != $speaker_id && ! is_admin() ) {
+				case 'proposal_title':
+				case 'proposal_content':
+					if ( ! is_admin() && ! empty( $wpc_profile->ID ) && $proposal_primary_speaker != $wpc_profile->ID ) {
 						$field->type = 'hidden';
 						$field->visibility = 'hidden';
-					}*/
+					}
 					break;
 
 				// The "Session Categories" and "Session Technical" taxonomy form field.
 				// TODO: Right now we're using the GF CPT extension
-				case 'session_categories':
-				case 'session_technical':
+				case 'proposal_subjects':
+				case 'proposal_technical':
+				case 'preferred_session_format':
+
+					if ( 'preferred_session_format' == $field->inputName ) {
+						$taxonomy = 'preferred_session_format';
+					} else if ( 'proposal_subjects' == $field->inputName ) {
+						$taxonomy = 'subjects';
+					} else {
+						$taxonomy = 'session_technical';
+					}
+
 					// Hide if multiple speakers.
-					/*if ( $session_primary_speaker != $speaker_id ) {
+					if ( ! empty( $wpc_profile->ID ) && $proposal_primary_speaker != $wpc_profile->ID ) {
 						if ( ! is_admin() ) {
 							$field->type = 'hidden';
 							$field->visibility = 'hidden';
 						}
-					} else {*/
+					} elseif ( ! empty( $wpc_proposal->ID ) && ! empty( $field->choices ) ) {
 
-						// Get the terms.
-						/*$terms = get_terms( array(
-							'taxonomy'   => $field->inputName,
-							'hide_empty' => false,
-							'orderby'    => 'name',
-							'order'      => 'ASC',
-							'fields'     => 'all',
-						) );
-						if ( ! empty( $terms ) ) {
-
-							// Add the terms as choices.
-							$choices = array();
-							$inputs  = array();
-
-							// Will hold selected terms.
+						// Get the selected terms.
+						$selected_terms = wp_get_object_terms( $wpc_proposal->ID, $taxonomy, array( 'fields' => 'ids' ) );
+						if ( empty( $selected_terms ) || is_wp_error( $selected_terms ) ) {
 							$selected_terms = array();
+						}
 
-							// We need the speaker and session ID.
-							if ( $speaker_id > 0 && $session_id > 0 ) {
+						foreach ( $field->choices as &$choice ) {
+							$choice['isSelected'] = in_array( $choice['value'], $selected_terms );
+							$choice['isChecked'] = in_array( $choice['value'], $selected_terms );
+						}
+					} else {
 
-								// Get the speaker's terms.
-								$selected_terms = wp_get_object_terms( $session_id, $field->inputName, array( 'fields' => 'ids' ) );
-								if ( empty( $terms ) || is_wp_error( $terms ) ) {
-									$selected_terms = array();
-								}
+						$field->choices = array();
+
+						$subjects = get_terms( $taxonomy, array( 'hide_empty' => false ) );
+
+						foreach( $subjects as $subject ) {
+							if ( ! empty( $subject->parent ) ) {
+								continue;
 							}
-
-							$term_index = 1;
-							foreach ( $terms as $term ) {
-
-								// Add the choice.
-								$choices[] = array(
-									'text'       => $term->name,
-									'value'      => $term->term_id,
-									'isSelected' => in_array( $term->term_id, $selected_terms ),
-								);
-
-								// Add the input.
-								$inputs[] = array(
-									'id'    => $field->id . '.' . $term_index,
-									'label' => $term->name,
-								);
-
-								$term_index ++;
-
-							}
-
-							// Assign the new choices and inputs
-							$field->choices = $choices;
-							$field->inputs  = $inputs;
-
-						}*/
-					//}
+							$field->choices[] = array(
+								'value' => (int) $subject->term_id,
+								'text' => $subject->name,
+								'isSelected' => false,
+							);
+						}
+					}
 
 					break;
+
+				case 'speaker_email':
+					if ( ! empty( $wp_user->user_email ) ) {
+						foreach ( $field->inputs as &$input ) {
+							$input['defaultValue'] = $wp_user->user_email;
+						}
+					}
+					break;
+
+				case 'speaker_bio':
+					if ( ! empty( $wp_user->ID ) ) {
+						$speaker_bio = get_the_author_meta( 'description', $wp_user->ID );
+						if ( ! empty( $speaker_bio ) ) {
+							$field['defaultValue'] = $speaker_bio;
+						}
+					}
+					break;
+
+				case 'speaker_website':
+					if ( ! empty( $wp_user->user_url ) ) {
+						$field['defaultValue'] = $wp_user->user_url;
+					}
+					break;
+
+				case 'speaker_twitter':
+					if ( ! empty( $wp_user->ID ) ) {
+						$speaker_twitter = get_the_author_meta( 'twitter', $wp_user->ID );
+						if ( ! empty( $speaker_twitter ) ) {
+							$field['defaultValue'] = $speaker_twitter;
+						}
+					}
+					break;
+
+				case 'speaker_company':
+					if ( ! empty( $wp_user->ID ) ) {
+						$speaker_company = get_the_author_meta( 'company', $wp_user->ID );
+						if ( ! empty( $speaker_company ) ) {
+							$field['defaultValue'] = $speaker_company;
+						}
+					}
+					break;
+
+				case 'speaker_position':
+					if ( ! empty( $wp_user->ID ) ) {
+						$speaker_position = get_the_author_meta( 'company_position', $wp_user->ID );
+						if ( ! empty( $speaker_position ) ) {
+							$field['defaultValue'] = $speaker_position;
+						}
+					}
+					break;
+			}
+
+			// Auto populate the primary speaker name.
+			if ( 'name' == $field->type && 'Speaker Name' == $field->adminLabel ) {
+
+				foreach ( $field->inputs as &$input ) {
+
+					switch( $input['name'] ) {
+
+						case 'speaker_first_name':
+							if ( ! empty( $wp_user->user_firstname ) ) {
+								$input['defaultValue'] = $wp_user->user_firstname;
+							}
+							break;
+
+						case 'speaker_last_name':
+							if ( ! empty( $wp_user->user_lastname ) ) {
+								$input['defaultValue'] = $wp_user->user_lastname;
+							}
+							break;
+					}
+				}
 			}
 		}
 
@@ -437,89 +483,60 @@ final class WPCampus_Speakers_Forms {
 	}
 
 	/**
-	 * Populate the session survey form.
-	 *
-	 * @access  public
-	 * @param   $form - array - the form information.
-	 * @return  array - the filtered form.
+	 * Force a process of all speaker applications.
 	 */
-	public function populate_session_survey_form( $form ) {
-
-		return $form;
-
-		// Get the post.
-		$session_id = get_query_var( 'session' );
-		if ( ! $session_id ) {
-			return $form;
+	public function process_speaker_applications() {
+		if ( ! is_admin() ) {
+			return;
 		}
 
-		// Get session information.
-		$session_post = get_post( $session_id );
-		if ( ! $session_post ) {
-			return $form;
+		if ( empty( $_GET['force_application_process'] ) ) {
+			return;
 		}
 
-		// Loop through the fields.
-		foreach ( $form['fields'] as &$field ) {
+		$current_screen = get_current_screen();
 
-			switch ( $field->inputName ) {
-
-				// Get the title.
-				case 'sessiontitle':
-					$session_title = get_the_title( $session_id );
-					if ( ! empty( $session_title ) ) {
-
-						// Set title.
-						$field->defaultValue = $session_title;
-
-						// Add CSS class so read only.
-						$field->cssClass .= ' gf-read-only';
-
-					}
-
-					break;
-
-				case 'speakername':
-					$event_speaker_ids = get_post_meta( $session_id, 'conf_sch_event_speaker', false );
-					if ( ! empty( $event_speaker_ids ) ) {
-
-						// Get speakers info.
-						$speakers = array();
-						foreach ( $event_speaker_ids as $speaker_id ) {
-							$speakers[] = get_the_title( $speaker_id );
-						}
-
-						// If we have speakers...
-						if ( ! empty( $speakers ) ) {
-
-							// Set speakers.
-							$field->defaultValue = implode( ', ', $speakers );
-
-							// Add CSS class so read only.
-							$field->cssClass .= ' gf-read-only';
-
-						}
-					}
-
-					break;
-			}
+		if ( 'proposal' != $current_screen->post_type ) {
+			return;
 		}
 
-		?>
-		<script type="text/javascript">
-			jQuery(document).ready(function(){
-				jQuery('li.gf-read-only input').attr('readonly','readonly');
-			});
-		</script>
-		<?php
+		if ( 'edit' != $current_screen->base ) {
+			return;
+		}
 
-		return $form;
+		// @TODO tweak capability?
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+
+		if ( ! class_exists( 'GFAPI' ) ) {
+			return;
+		}
+
+		$speaker_app_id = wpcampus_speakers()->get_speaker_app_form_id();
+		if ( ! ( $speaker_app_id > 0 ) ) {
+			return;
+		}
+
+		$form = GFAPI::get_form( $speaker_app_id );
+		if ( empty( $form['id'] ) ) {
+			return;
+		}
+
+		$entries = GFAPI::get_entries( $speaker_app_id );
+		if ( empty( $entries ) ) {
+			return;
+		}
+
+		foreach ( $entries as $entry ) {
+			$this->process_speaker_application( $entry, $form );
+		}
 	}
 
 	/**
-	 * Process the WPCampus 2018 speaker application.
+	 * Process the WPCampus speaker application.
 	 */
-	public function process_2018_speaker_application( $entry, $form ) {
+	public function process_speaker_application( $entry, $form ) {
 
 		// Make sure the form is active.
 		if ( empty( $form['is_active'] ) ) {
@@ -590,7 +607,7 @@ final class WPCampus_Speakers_Forms {
 			} else {
 
 				// Get the field value.
-				$field_value = rgar( $entry, $field->id );
+				$field_value = $field->get_value_export( $entry ); //rgar( $entry, $field->id );
 
 				// Process other input names.
 				switch ( $field->inputName ) {
@@ -621,12 +638,12 @@ final class WPCampus_Speakers_Forms {
 
 					// Remove any non alphanumeric characters.
 					case 'speaker_twitter':
-						$speaker['twitter'] = preg_replace( '/[^a-z0-9]/i', '', $field_value );
+						$speaker['twitter'] = preg_replace( '/[^a-z0-9\_]/i', '', $field_value );
 						break;
 
 					// Remove any non alphanumeric characters.
 					case 'speaker2_twitter':
-						$speaker2['twitter'] = preg_replace( '/[^a-z0-9]/i', '', $field_value );
+						$speaker2['twitter'] = preg_replace( '/[^a-z0-9\_]/i', '', $field_value );
 						break;
 
 					case 'speaker_linkedin':
@@ -669,8 +686,21 @@ final class WPCampus_Speakers_Forms {
 						$session['desc'] = $field_value;
 						break;
 
+					case 'proposal_subjects':
+						$session['categories'] = explode( ',', $field_value );
+						$session['categories'] = array_map( 'trim', $session['categories'] );
+						$session['categories'] = array_filter( $session['categories'] );
+						break;
+
 					case 'other_session_categories':
 						$session['other_categories'] = strip_tags( $field_value );
+						break;
+
+					case 'preferred_session_format':
+						$session['preferred_session_format'] = explode( ',', $field_value );
+						$session['preferred_session_format'] = array_map( 'trim', $session['preferred_session_format'] );
+						$session['preferred_session_format'] = array_map( 'intval', $session['preferred_session_format'] );
+						$session['preferred_session_format'] = array_filter( $session['preferred_session_format'] );
 						break;
 
 					case 'user_id':
@@ -681,15 +711,27 @@ final class WPCampus_Speakers_Forms {
 			}
 		}
 
+		// Store preferred session format.
+		if ( ! empty( $session['preferred_session_format'] ) ) {
+			wp_set_object_terms( $post_id, $session['preferred_session_format'], 'preferred_session_format', true );
+		}
+
+		$category_ids = array();
+
+		// Set the "other" categories for the session.
+		if ( ! empty( $session['categories'] ) ) {
+			foreach( $session['categories'] as $category_id ) {
+				$category_ids[] = (int) $category_id;
+			}
+		}
+
 		// Set the "other" categories for the session.
 		if ( ! empty( $session['other_categories'] ) ) {
 
 			// Convert to array.
 			$other_categories = explode( ',', $session['other_categories'] );
+			$other_categories = array_map( 'trim', $other_categories );
 			if ( ! empty( $other_categories ) ) {
-
-				// Will hold final term IDs.
-				$other_category_ids = array();
 
 				// Add term.
 				foreach ( $other_categories as $new_term_string ) {
@@ -698,7 +740,7 @@ final class WPCampus_Speakers_Forms {
 					$term_exists = term_exists( $new_term_string, 'subjects' );
 
 					if ( ! empty( $term_exists['term_id'] ) ) {
-						$other_category_ids[] = (int) $term_exists['term_id'];
+						$category_ids[] = (int) $term_exists['term_id'];
 					} else {
 
 						// Create the term.
@@ -706,24 +748,22 @@ final class WPCampus_Speakers_Forms {
 						if ( ! is_wp_error( $new_term ) && ! empty( $new_term['term_id'] ) ) {
 
 							// Add to list to assign later.
-							$other_category_ids[] = $new_term['term_id'];
+							$category_ids[] = $new_term['term_id'];
 
 						}
 					}
 				}
-
-				// Add all new categories to session.
-				if ( ! empty( $other_category_ids ) ) {
-					wp_set_object_terms( $post_id, $other_category_ids, 'subjects', true );
-				}
 			}
 		}
 
-		// Set the event to "WPCampus 2018".
-		$event_term = term_exists( 'wpcampus-2018', 'proposal_event' );
+		// Add all categories to session.
+		if ( ! empty( $category_ids ) ) {
+			wp_set_object_terms( $post_id, $category_ids, 'subjects', true );
+		}
 
-		if ( ! empty( $event_term['term_id'] ) ) {
-			$event_term_id = (int) $event_term['term_id'];
+		// Set the event.
+		$event_term_id = wpcampus_speakers()->get_speaker_app_event_id();
+		if ( ! empty( $event_term_id ) ) {
 
 			wp_set_object_terms( $post_id, $event_term_id, 'proposal_event', false );
 			add_post_meta( $post_id, 'proposal_event', $event_term_id, true );
@@ -781,9 +821,9 @@ final class WPCampus_Speakers_Forms {
 			// Create the speaker profile.
 			$profile_post_id = wp_insert_post( array(
 				'post_type'    => 'profile',
-				'post_status'  => 'pending',
+				'post_status'  => 'publish',
 				'post_title'   => $speaker_name,
-				'post_content' => $this_speaker['bio'],
+				'post_content' => wpcampus_speakers()->strip_content_tags( $this_speaker['bio'] ),
 			));
 
 			// Make sure the post was created before continuing.
@@ -958,483 +998,96 @@ final class WPCampus_Speakers_Forms {
 	 * @param   $form - array - the form array
 	 * @return  string - the filtered HTML.
 	 */
-	public function filter_2017_speaker_confirmation_form( $form_string, $form ) {
+	public function filter_speaker_confirmation_form( $form_string, $form ) {
+		global $wpc_proposal, $wpc_profile;
 
-		return $form_string;
-
-		// Only on 2017 website.
-		if ( 7 != $blog_id ) {
-			return false;
+		if ( ! is_user_logged_in() ) {
+			return '<p><em>You must be logged-in to view this content.</em></p>' . wp_login_form( array( 'echo' => false ) );
 		}
 
 		// Build error message.
-		$error_message = '<div class="callout">
+		$error_message = '<div class="panel blue">
 			<p>Oops! It looks like we\'re missing some important information to confirm your session.</p>
 			<p>Try the link from your confirmation email again and, if the form continues to fail, please <a href="/contact/">let us know</a>.</p>
 		</div>';
 
-		// Get the speaker ID
-		$speaker_id = $this->get_form_speaker_id();
-		if ( ! $speaker_id ) {
+		if ( empty( $_GET['proposal'] ) || empty( $_GET['profile'] ) || ! function_exists( 'wpcampus_speakers' ) ) {
 			return $error_message;
 		}
 
-		// Check the confirmation ID.
-		$check_confirmation_id = $this->check_form_speaker_confirmation_id( $speaker_id );
-		if ( ! $check_confirmation_id ) {
+		if ( empty( $wpc_proposal->ID ) || empty( $wpc_proposal->speakers ) || empty( $wpc_profile->ID ) || empty( $wpc_profile->wordpress_user ) ) {
 			return $error_message;
 		}
 
-		// Get the speaker post, session ID and session post.
-		$speaker_post = $this->get_form_speaker_post( $speaker_id );
-		$session_id   = $this->get_form_session_id();
-		$session_post = $this->get_form_session_post( $session_id );
-
-		if ( ! $speaker_post || ! $session_id || ! $session_post ) {
-			return $error_message;
+		// Check that the user is logged in.
+		if ( get_current_user_id() != $wpc_profile->wordpress_user ) {
+			if ( ! current_user_can( 'view_wpc_proposal_confirmation' ) ) {
+				return $error_message;
+			}
 		}
 
-		// Build format string.
-		$format_key = get_post_meta( $session_id, 'conf_sch_event_format', true );
-		switch ( $format_key ) {
+		$feedback = get_post_meta( $wpc_proposal->ID, 'proposal_feedback', true );
 
-			case 'lightning':
-				$format = 'lightning talk';
-				break;
-
-			case 'workshop':
-				$format = 'workshop';
-				break;
-
-			default:
-				$format = '45-minute session';
-				break;
+		// Get string of other speaker names.
+		$other_speakers = array();
+		foreach ( $wpc_proposal->speakers as $speaker ) {
+			if ( $speaker->ID != $wpc_profile->ID ) {
+				$other_speakers[] = $speaker->display_name;
+			}
 		}
 
-		// Add message.
-		$message = '<div class="callout">
-			<p><strong>Hello ' . $speaker_post->post_title . '!</strong> You have been selected to present on "' . $session_post->post_title . '" as a ' . $format . '.</p>
-			<p>Congratulations and thank you from all of us in the WPCampus community.</p>
-			<p><strong>Please review and confirm your acceptance to present as soon as you can, and no later than Wednesday, April 19.</strong></p>
-			<p>We\'re really grateful to have you present and share your knowledge and experience at WPCampus 2017. Please answer a few questions to confirm your session and help ensure a great conference.</p>
+		if ( ! empty( $wpc_proposal->format_name ) ) {
+			$format_name = $wpc_proposal->format_name;
+		} else {
+			$format_name = null;
+		}
+
+		if ( ! empty( $wpc_proposal->format_slug ) ) {
+			$format_slug = $wpc_proposal->format_slug;
+		} else {
+			$format_slug = $format_name;
+		}
+
+		$message = '<div class="panel royal-blue"><strong>This form is meant for ' . $wpc_profile->display_name . '.</strong> If you are not ' . $wpc_profile->first_name . ', please do not submit this form.</div>
+		<div class="panel blue">
+			<p><strong>Hello ' . $wpc_profile->first_name . '!</strong></p>
+			<p>You have been selected to present on <strong>"' . $wpc_proposal->title . '"</strong>';
+
+		if ( ! empty( $format_name ) ) {
+			$message .= ' as a <strong>' . $format_name . '</strong>';
+		}
+
+		if ( ! empty( $other_speakers ) ) {
+			$message .= ' with ' . implode( ' and ', $other_speakers ) . '';
+		}
+
+		$message .= '.';
+
+		if ( ! empty( $format_slug ) ) {
+			if ( in_array( $format_slug, [ 'workshop', 'Hands-on Workshop' ] ) ) {
+				$message .= ' We are finalizing the exact times for workshops on Thursday, July 25. But you can expect it to last at least 3 hours. 4 hours at most, which will include breaks.';
+			} else if ( in_array( $format_slug, [ 'lightning-talk', 'Lightning Talk' ] ) ) {
+				$message .= ' All lightning talks will be presented the morning of Friday, July 26. Each talk will last no more than 10 minutes. There will be no live Q&A.</p>';
+			} else {
+				$message .= ' Your session will last 45 minutes, including time for Q&A.</p>';
+			}
+		}
+
+		$message .= '<p>Congratulations and thank you from the entire WPCampus community.</p>
+			<p><strong>Please review and confirm your acceptance by Tuesday, May 28.</strong>';
+
+		if ( ! empty( $feedback ) ) {
+			$message .= ' We\'ve also included feedback for you to consider as you confirm and work on your session. Let us know if you have any questions about our notes.';
+		}
+
+		$message .= '</p><p>We\'re extremely grateful to have you present and share your knowledge and experience at WPCampus 2019. Please answer a few questions to confirm your session and help ensure a great conference.</p>
 		</div>';
 
+		if ( ! empty( $feedback ) ) {
+			$message.= '<div class="panel light-red"><strong>Session feedback:</strong> ' . $feedback . '</div>';
+		}
+
 		return $message . $form_string;
-	}
-
-	/**
-	 * Process the WPCampus 2017 speaker confirmation.
-	 */
-	public function process_2017_speaker_confirmation( $entry, $form ) {
-
-		return;
-
-		// Only on 2017 website.
-		if ( 7 != $blog_id ) {
-			return false;
-		}
-
-		// Make sure the form is active.
-		if ( ! isset( $form['is_active'] ) || ! $form['is_active'] ) {
-			return false;
-		}
-
-		// Set the entry ID.
-		$entry_id = $entry['id'];
-
-		// Make sure we have an entry ID.
-		if ( ! $entry_id ) {
-			return false;
-		}
-
-		echo '<pre>';
-		print_r( $entry );
-		echo '</pre>';
-
-		exit;
-
-		/*// First, check to see if the entry has already been processed.
-		$entry_post = wpcampus_forms()->get_entry_post( $entry_id );
-
-		// If this entry has already been processed, then skip.
-		if ( $entry_post && isset( $entry_post->ID ) ) {
-			return false;
-		}
-
-		// Set the schedule post ID.
-		$schedule_post_id = $entry['post_id'];
-
-		// Hold speaker information.
-		$speaker = array();
-		$speaker2 = array();
-
-		// Hold session information.
-		$session = array();
-
-		// Process one field at a time.
-		foreach ( $form['fields'] as $field ) {
-
-			// Skip certain types.
-			if ( in_array( $field->type, array( 'section' ) ) ) {
-				continue;
-			}
-
-			// Process names.
-			if ( 'name' == $field->type ) {
-
-				// Process each name part.
-				foreach ( $field->inputs as $input ) {
-
-					// Get the input value.
-					$input_value = rgar( $entry, $input['id'] );
-
-					switch ( $input['name'] ) {
-
-						case 'speaker_first_name':
-							$speaker['first_name'] = $input_value;
-							break;
-
-						case 'speaker2_first_name':
-							$speaker2['first_name'] = $input_value;
-							break;
-
-						case 'speaker_last_name':
-							$speaker['last_name'] = $input_value;
-							break;
-
-						case 'speaker2_last_name':
-							$speaker2['last_name'] = $input_value;
-							break;
-
-					}
-				}
-			} elseif ( 'session_categories' == $field->inputName ) {
-
-				// Get all the categories and place in array.
-				$session['categories'] = array();
-
-				foreach ( $field->inputs as $input ) {
-					if ( $this_data = rgar( $entry, $input['id'] ) ) {
-						$session['categories'][] = $this_data;
-					}
-				}
-
-				// Make sure we have categories.
-				if ( ! empty( $session['categories'] ) ) {
-
-					// Make sure its all integers.
-					$session['categories'] = array_map( 'intval', $session['categories'] );
-
-				}
-			} elseif ( 'session_technical' == $field->inputName ) {
-
-				// Get all the skill levels and place in array.
-				$session['levels'] = array();
-
-				foreach ( $field->inputs as $input ) {
-					if ( $this_data = rgar( $entry, $input['id'] ) ) {
-						$session['levels'][] = $this_data;
-					}
-				}
-
-				// Make sure we have levels.
-				if ( ! empty( $session['levels'] ) ) {
-
-					// Make sure its all integers.
-					$session['levels'] = array_map( 'intval', $session['levels'] );
-
-				}
-			} else {
-
-				// Get the field value.
-				$field_value = rgar( $entry, $field->id );
-
-				// Process the speaker photos.
-				if ( 'Speaker Photo' == $field->adminLabel ) {
-
-					$speaker['photo'] = $field_value;
-
-				} elseif ( 'Speaker Two Photo' == $field->adminLabel ) {
-
-					$speaker2['photo'] = $field_value;
-
-				} else {
-
-					// Process other input names.
-					switch ( $field->inputName ) {
-
-						case 'speaker_email':
-							$speaker['email'] = $field_value;
-							break;
-
-						case 'speaker2_email':
-							$speaker2['email'] = $field_value;
-							break;
-
-						case 'speaker_bio':
-							$speaker['bio'] = $field_value;
-							break;
-
-						case 'speaker2_bio':
-							$speaker2['bio'] = $field_value;
-							break;
-
-						case 'speaker_website':
-							$speaker['website'] = $field_value;
-							break;
-
-						case 'speaker2_website':
-							$speaker2['website'] = $field_value;
-							break;
-
-						case 'speaker_twitter':
-
-							// Remove any non alphanumeric characters.
-							$speaker['twitter'] = preg_replace( '/[^a-z0-9]/i', '', $field_value );
-							break;
-
-						case 'speaker2_twitter':
-
-							// Remove any non alphanumeric characters.
-							$speaker2['twitter'] = preg_replace( '/[^a-z0-9]/i', '', $field_value );
-							break;
-
-						case 'speaker_linkedin':
-							$speaker['linkedin'] = $field_value;
-							break;
-
-						case 'speaker2_linkedin':
-							$speaker2['linkedin'] = $field_value;
-							break;
-
-						case 'speaker_company':
-							$speaker['company'] = $field_value;
-							break;
-
-						case 'speaker2_company':
-							$speaker2['company'] = $field_value;
-							break;
-
-						case 'speaker_company_website':
-							$speaker['company_website'] = $field_value;
-							break;
-
-						case 'speaker2_company_website':
-							$speaker2['company_website'] = $field_value;
-							break;
-
-						case 'speaker_position':
-							$speaker['position'] = $field_value;
-							break;
-
-						case 'speaker2_position':
-							$speaker2['position'] = $field_value;
-							break;
-
-						case 'session_title':
-							$session['title'] = $field_value;
-							break;
-
-						case 'session_desc':
-							$session['desc'] = $field_value;
-							break;
-
-						case 'other_session_categories':
-							$session['other_categories'] = $field_value;
-							break;
-
-					}
-				}
-			}
-		}
-
-		// If no schedule post was made, create a post.
-		if ( ! $schedule_post_id ) {
-			$schedule_post_id = wp_insert_post( array(
-				'post_type'     => 'proposal',
-				'post_status'   => 'pending',
-				'post_title'    => $session['title'],
-				'post_content'  => $session['desc'],
-			));
-		} else {
-
-			// Otherwise, make sure the post is updated.
-			$schedule_post_id = wp_insert_post( array(
-				'ID'            => $schedule_post_id,
-				'post_type'     => 'proposal',
-				'post_status'   => 'pending',
-				'post_title'    => $session['title'],
-				'post_content'  => $session['desc'],
-			));
-
-		}
-
-		// No point in continuing if no schedule post ID.
-		if ( is_wp_error( $schedule_post_id ) || ! $schedule_post_id ) {
-			return false;
-		}
-
-		// Set the categories for the session.
-		if ( ! empty( $session['categories'] ) ) {
-			wp_set_object_terms( $schedule_post_id, $session['categories'], 'session_categories', false );
-		}
-
-		// Set the "other" categories for the session.
-		if ( ! empty( $session['other_categories'] ) ) {
-
-			// Convert to array.
-			$other_categories = explode( ',', $session['other_categories'] );
-			if ( ! empty( $other_categories ) ) {
-
-				// Will hold final term IDs.
-				$other_category_ids = array();
-
-				// Add term.
-				foreach ( $other_categories as $new_term_string ) {
-
-					// Create the term.
-					$new_term = wp_insert_term( $new_term_string, 'session_categories' );
-					if ( ! is_wp_error( $new_term ) && ! empty( $new_term['term_id'] ) ) {
-
-						// Add to list to assign later.
-						$other_category_ids[] = $new_term['term_id'];
-
-					}
-				}
-
-				// Assign all new categories to session.
-				if ( ! empty( $other_category_ids ) ) {
-					wp_set_object_terms( $schedule_post_id, $other_category_ids, 'session_categories', false );
-				}
-			}
-		}
-
-		// Set the technical levels for the session.
-		if ( ! empty( $session['levels'] ) ) {
-			wp_set_object_terms( $schedule_post_id, $session['levels'], 'session_technical', false );
-		}
-
-		// Set the event type to "session".
-		wp_set_object_terms( $schedule_post_id, 'session', 'event_types', false );
-
-		// Store the GF entry ID for the schedule post.
-		add_post_meta( $schedule_post_id, 'gf_entry_id', $entry_id, true );
-
-		// Will hold the speaker post IDs for the schedule post.
-		$schedule_post_speakers = array();
-
-		// Create speaker posts.
-		foreach ( array( $speaker, $speaker2 ) as $this_speaker ) {
-
-			// Make sure they have an email.
-			if ( empty( $this_speaker['email'] ) ) {
-				continue;
-			}
-
-			// See if a WP user exists for their email.
-			$wp_user = get_user_by( 'email', $this_speaker['email'] );
-
-			// Build the speaker name.
-			$name = '';
-
-			// Build from form.
-			if ( ! empty( $this_speaker['first_name'] ) ) {
-				$name .= $this_speaker['first_name'];
-
-				if ( ! empty( $this_speaker['last_name'] ) ) {
-					$name .= ' ' . $this_speaker['last_name'];
-				}
-			}
-
-			// If no name but found WP user, get from user data.
-			if ( empty( $name ) && is_a( $wp_user, 'WP_User' ) ) {
-				$speaker_display_name = $wp_user->get( 'display_name' );
-				if ( ! empty( $speaker_display_name ) ) {
-					$name = $speaker_display_name;
-				}
-			}
-
-			// No point if no name.
-			if ( ! $name ) {
-				continue;
-			}
-
-			// Create the speaker.
-			$speaker_post_id = wp_insert_post( array(
-				'post_type'     => 'speakers',
-				'post_status'   => 'pending',
-				'post_title'    => $name,
-				'post_content'  => $this_speaker['bio'],
-			));
-
-			// Make sure the post was created before continuing.
-			if ( ! $speaker_post_id ) {
-				continue;
-			}
-
-			// Store the WordPress user ID.
-			if ( ! empty( $wp_user->ID ) && $wp_user->ID > 0 ) {
-				add_post_meta( $speaker_post_id, 'conf_sch_speaker_user_id', $wp_user->ID, true );
-			}
-
-			// Store speaker post meta.
-			add_post_meta( $speaker_post_id, 'conf_sch_speaker_email', $this_speaker['email'], true );
-			add_post_meta( $speaker_post_id, 'conf_sch_speaker_url', $this_speaker['website'], true );
-			add_post_meta( $speaker_post_id, 'conf_sch_speaker_company', $this_speaker['company'], true );
-			add_post_meta( $speaker_post_id, 'conf_sch_speaker_company_url', $this_speaker['company_website'], true );
-			add_post_meta( $speaker_post_id, 'conf_sch_speaker_position', $this_speaker['position'], true );
-			add_post_meta( $speaker_post_id, 'conf_sch_speaker_twitter', $this_speaker['twitter'], true );
-			add_post_meta( $speaker_post_id, 'conf_sch_speaker_linkedin', $this_speaker['linkedin'], true );
-
-			// Add the speaker photo.
-			if ( ! empty( $this_speaker['photo'] ) ) {
-
-				// Set variables for storage, fix file filename for query strings.
-				preg_match( '/[^\?]+\.(jpe?g|png)\b/i', $this_speaker['photo'], $matches );
-				if ( ! empty( $matches[0] ) ) {
-
-					// Make sure we have the files we need.
-					require_once( ABSPATH . 'wp-admin/includes/file.php' );
-					require_once( ABSPATH . 'wp-admin/includes/image.php' );
-					require_once( ABSPATH . 'wp-admin/includes/media.php' );
-
-					// Download the file to temp location.
-					$tmp_file = download_url( $this_speaker['photo'] );
-
-					// Setup the file info.
-					$file_array = array(
-						'name'     => basename( $matches[0] ),
-						'tmp_name' => $tmp_file,
-					);
-
-					// If no issues with the file...
-					if ( ! is_wp_error( $file_array['tmp_name'] ) ) {
-
-						// Upload the image to the media library.
-						$speaker_image_id = media_handle_sideload( $file_array, $speaker_post_id, $name );
-
-						// Assign image to the speaker.
-						if ( ! is_wp_error( $speaker_image_id ) ) {
-							set_post_thumbnail( $speaker_post_id, $speaker_image_id );
-						}
-					}
-				}
-			}
-
-			// Store for the schedule post.
-			$schedule_post_speakers[] = $speaker_post_id;
-
-			// Store the GF entry ID.
-			add_post_meta( $speaker_post_id, 'gf_entry_id', $entry_id, true );
-
-		}
-
-		// Assign speakers to schedule post.
-		if ( ! empty( $schedule_post_speakers ) ) {
-			foreach ( $schedule_post_speakers as $speaker_id ) {
-				add_post_meta( $schedule_post_id, 'conf_sch_event_speaker', $speaker_id, false );
-			}
-		}*/
 	}
 
 	/**
@@ -1554,7 +1207,7 @@ final class WPCampus_Speakers_Forms {
 		}
 
 		// Add blog content.
-		$speaker_blog_post['post_content'] = $speaker_blog_content;
+		$speaker_blog_post['post_content'] = wpcampus_speakers()->strip_content_tags( $speaker_blog_content );
 
 		// Make sure we have post info.
 		if ( empty( $speaker_blog_post ) ) {
@@ -1578,33 +1231,57 @@ final class WPCampus_Speakers_Forms {
 	}
 
 	/**
-	 * Manually update session information
+	 * Process the WPCampus speaker confirmation.
+	 */
+	public function process_speaker_confirmation( $entry, $form ) {
+		$this->update_proposal_from_speaker_confirmation( $entry, $form );
+	}
+
+	/**
+	 * Manually update proposals and profiles
 	 * from ALL speaker confirmations.
 	 *
 	 * @TODO:
 	 * - create an admin button for this?
 	 */
-	public function update_sessions_from_speaker_confirmations() {
+	public function update_proposals_from_speaker_confirmations() {
+		global $current_screen;
 
-		return;
+		// The action is only run in the admin but just in case.
+		if ( ! is_admin() ) {
+			return;
+		}
+
+		// Only run for Rachel.
+		if ( 1 != get_current_user_id() ) {
+			return;
+		}
+
+		// Only run on the proposals screen.
+		if ( empty( $current_screen->base ) || 'edit' != $current_screen->base ) {
+			return;
+		}
+
+		if ( empty( $current_screen->post_type ) || 'proposal' != $current_screen->post_type ) {
+			return;
+		}
+
+		// Check if we want to check confirmations.
+		if ( empty( get_option( 'wpc_check_speaker_confirmations' ) ) ) {
+			return;
+		}
 
 		// Make sure GFAPI exists.
 		if ( ! class_exists( 'GFAPI' ) ) {
-			return false;
+			return;
 		}
 
-		/*
-		 * !!!!!!
-		 * @TODO
-		 * !!!!!!
-		 *
-		 * Keep from running on every page load.
-		 *
-		 * !!!!!
-		 */
-
 		// ID for speaker confirmation form.
-		$form_id = 8;
+		$form_id = wpcampus_speakers()->get_speaker_confirmation_form_id();
+
+		if ( empty( $form_id ) ) {
+			return;
+		}
 
 		// What entry should we start on?
 		$entry_offset = 0;
@@ -1631,7 +1308,7 @@ final class WPCampus_Speakers_Forms {
 
 			// Process each entry.
 			foreach ( $entries as $entry ) {
-				//$this->update_session_from_speaker_confirmation( $entry, $form );
+				$this->update_proposal_from_speaker_confirmation( $entry, $form );
 			}
 		}
 	}
@@ -1641,15 +1318,12 @@ final class WPCampus_Speakers_Forms {
 	 * a SPECIFIC speaker confirmation.
 	 *
 	 * Can pass entry ID or object.
-	 * Can oass form ID or object.
+	 * Can pass form ID or object.
 	 *
 	 * @TODO:
 	 * - create an admin button for this?
 	 */
-	public function update_session_from_speaker_confirmation( $entry, $form ) {
-		global $wpdb;
-
-		return;
+	public function update_proposal_from_speaker_confirmation( $entry, $form ) {
 
 		// Make sure GFAPI exists.
 		if ( ! class_exists( 'GFAPI' ) ) {
@@ -1671,217 +1345,600 @@ final class WPCampus_Speakers_Forms {
 			return false;
 		}
 
-		// Set the entry id.
+		// Make sure the form is active.
+		if ( empty( $form['is_active'] ) ) {
+			return false;
+		}
+
+		// Set the entry ID.
 		$entry_id = $entry['id'];
 
-		// Will hold the speaker and session ID.
-		$speaker_id = 0;
-		$session_id = null;
-
-		// Is the meta value the entry ID is being stored under.
-		$speaker_post_type      = 'speakers';
-		$speaker_entry_meta_key = 'gf_speaker_conf_entry_id';
-
-		// Get the entry's speaker ID.
-		foreach ( $form['fields']  as $field ) {
-
-			// Get out of here if speaker and session ID have been checked.
-			if ( isset( $speaker_id ) && isset( $session_id ) ) {
-				break;
-			}
-
-			// Get speaker and session IDs.
-			if ( 'speaker' == $field->inputName ) {
-				$speaker_id = rgar( $entry, $field->id );
-				if ( ! ( $speaker_id > 0 ) ) {
-					$speaker_id = null;
-				}
-			} elseif ( 'session' == $field->inputName ) {
-				$session_id = rgar( $entry, $field->id );
-				if ( ! ( $session_id > 0 ) ) {
-					$session_id = null;
-				}
-			}
-		}
-
-		// If no speaker ID, get out of here.
-		if ( ! $speaker_id ) {
+		// Make sure we have an entry ID.
+		if ( empty( $entry_id ) ) {
 			return false;
 		}
 
-		// Check to see if the speaker has already been processed.
-		$speaker_post = $wpdb->get_row( $wpdb->prepare( "SELECT posts.*, meta.meta_value AS gf_entry_id FROM {$wpdb->posts} posts INNER JOIN {$wpdb->postmeta} meta ON meta.post_id = posts.ID AND meta.meta_key = %s AND meta.meta_value = %s WHERE posts.post_type = %s", $speaker_entry_meta_key, $entry_id, $speaker_post_type ) );
+		// Store info.
+		$user_id = 0;
+		$proposal_id = 0;
+		$profile_id = 0;
+		$primary_speaker_id = 0;
+		$speaker_confirm = false;
+		$entry_info = array();
 
-		// If this speaker has already been processed, then skip.
-		if ( ! empty( $speaker_post->ID ) && $speaker_post->ID == $speaker_id ) {
-			return false;
-		}
+		// If true, will update info from speaker confirmations.
+		$debug_update = (bool) get_option( 'options_wpc_debug_speaker_confirmation_update' );
+		$enable_update = $debug_update ? false : $this->is_enable_speaker_confirmation_update();
 
-		// Straightforward input to post meta fields.
-		$speaker_meta_input_fields = array(
-			'speaker_website'         => 'conf_sch_speaker_url',
-			'speaker_company'         => 'conf_sch_speaker_company',
-			'speaker_company_website' => 'conf_sch_speaker_company_url',
-			'speaker_position'        => 'conf_sch_speaker_position',
-			'speaker_twitter'         => 'conf_sch_speaker_twitter',
-			'speaker_linkedin'        => 'conf_sch_speaker_linkedin',
-			'speaker_email'           => 'conf_sch_speaker_email',
-			'speaker_phone'           => 'conf_sch_speaker_phone',
-		);
-
-		// Will hold speaker post information to update.
-		$update_speaker_post = array();
-
-		// Will hold session post information to update.
-		$update_session_post = array();
+		// Keeps track of what changed.
+		$changed = array();
 
 		// Process one field at a time.
 		foreach ( $form['fields'] as $field ) {
 
-			// Don't worry about these types.
-			if ( in_array( $field->type, array( 'html', 'section' ) ) ) {
+			// Ignore these types.
+			if ( in_array( $field->type, array( 'section', 'html' ) ) ) {
 				continue;
 			}
 
-			// Get the field value.
-			$field_value = rgar( $entry, $field->id );
+			if ( 'name' == $field->type ) {
 
-			// Get confirmation status.
-			if ( 'Speaker Confirmation' == $field->label ) {
-				if ( ! empty( $field_value ) ) {
-
-					// Set the status.
-					if ( in_array( $field_value, array( 'I can attend and speak at WPCampus 2017' ) ) ) {
-						$speaker_status = 'confirmed';
-					} else {
-						$speaker_status = 'declined';
-					}
-
-					// Update the speaker's status.
-					// @TODO: Now uses "proposal_status" for proposal post type.
-					//update_post_meta( $speaker_id, 'conf_sch_speaker_status', $speaker_status );
-
-				}
-			} elseif ( ! empty( $speaker_meta_input_fields[ $field->inputName ] ) ) {
-
-				// Update the speaker's post meta from the input.
-				if ( ! empty( $field_value ) ) {
-					update_post_meta( $speaker_id, $speaker_meta_input_fields[ $field->inputName ], sanitize_text_field( $field_value ) );
-				}
-			} elseif ( 'speaker_name' == $field->inputName ) {
-
-				// Set the speaker title to be updated.
-				if ( ! empty( $field_value ) ) {
-					$update_speaker_post['post_title'] = sanitize_text_field( $field_value );
-				}
-			} elseif ( 'speaker_bio' == $field->inputName ) {
-
-				// Set the speaker biography to be updated.
-				if ( ! empty( $field_value ) ) {
-					$update_speaker_post['post_content'] = wpcampus_speakers()->strip_content_tags( $field_value );
-				}
-			} elseif ( 'session_title' == $field->inputName ) {
-
-				// Set the session title to be updated.
-				if ( ! empty( $field_value ) ) {
-					$update_session_post['post_title'] = sanitize_text_field( $field_value );
-				}
-			} elseif ( 'session_desc' == $field->inputName ) {
-
-				// Set the session description to be updated.
-				if ( ! empty( $field_value ) ) {
-					$update_session_post['post_content'] = wpcampus_speakers()->strip_content_tags( $field_value );
-				}
-			} elseif ( 'Technology' == $field->adminLabel ) {
-
-				// Update the speaker's technology.
-				if ( ! empty( $field_value ) ) {
-					update_post_meta( $speaker_id, 'wpc_speaker_technology', sanitize_text_field( $field_value ) );
-				}
-			} elseif ( 'Video Release' == $field->adminLabel ) {
-
-				// Update the speaker's video release.
-				if ( ! empty( $field_value ) ) {
-					$allowable_tags = '<a><ul><ol><li><em><strong><b><br><br />';
-					update_post_meta( $speaker_id, 'wpc_speaker_video_release', wpcampus_speakers()->strip_content_tags( $field_value, $allowable_tags ) );
-				}
-			} elseif ( 'Special Requests' == $field->adminLabel ) {
-
-				// Update the speaker's special requests.
-				if ( ! empty( $field_value ) ) {
-					update_post_meta( $speaker_id, 'wpc_speaker_special_requests', wpcampus_speakers()->strip_content_tags( $field_value ) );
-				}
-			} elseif ( 'Arrival' == $field->adminLabel ) {
-
-				// Update the speaker's arrival.
-				if ( ! empty( $field_value ) ) {
-					update_post_meta( $speaker_id, 'wpc_speaker_arrival', sanitize_text_field( $field_value ) );
-				}
-			} elseif ( 'Session Unavailability' == $field->label ) {
-
-				// Get all the input data and place in array.
-				$unavailability = array();
+				// Process each name part.
 				foreach ( $field->inputs as $input ) {
-					$this_data = rgar( $entry, $input['id'] );
-					if ( ! empty( $this_data ) ) {
-						$unavailability[] = sanitize_text_field( $this_data );
+
+					switch ( $input['name'] ) {
+
+						case 'profile_first_name':
+						case 'profile_last_name':
+							$entry_info[ $input['name'] ] = rgar( $entry, $input['id'] );
+							break;
+					}
+				}
+			} elseif ( in_array( $field->type, array( 'checkbox' ) ) ) {
+
+				$values = array();
+
+				foreach ( $field->inputs as $input ) {
+					$value = rgar( $entry, $input['id'] );
+					if ( ! empty( $value ) ) {
+						$values[] = $value;
 					}
 				}
 
-				// Update the speaker's unavailability.
-				if ( ! empty( $unavailability ) ) {
-					update_post_meta( $speaker_id, 'wpc_speaker_unavailability', implode( ', ', $unavailability ) );
+				$input_name = $field['inputName'];
+				switch ( $input_name ) {
+
+					case 'proposal_subjects':
+					case 'proposal_technical':
+						$values = array_filter( $values, 'is_numeric' );
+						$values = array_map( 'intval', $values );
+						$entry_info[ $input_name ] = ! empty( $values ) ? $values : array();
+						break;
+
+					case 'event_coc':
+						$entry_info[ $input_name ] = ! empty( $values ) ? implode( ', ', $values ) : array();
+						break;
+
+					case 'event_unavailability':
+					default:
+						$entry_info[ $input_name ] = ! empty( $values ) ? $values : array();
+						break;
 				}
-			} elseif ( in_array( $field->inputName, array( 'session_categories', 'session_technical' ) ) ) {
+			} elseif ( ! empty( $field['inputName'] ) ) {
 
-				// Make sure we have a session ID.
-				if ( $session_id > 0 ) {
+				$input_name = $field['inputName'];
+				$input_value = rgar( $entry, $field['id'] );
 
-					// Get all the input data and place in array.
-					$term_ids = array();
-					foreach ( $field->inputs as $input ) {
-						$this_data = rgar( $entry, $input['id'] );
-						if ( ! empty( $this_data ) ) {
-							$term_ids[] = $this_data;
-						}
-					}
+				switch ( $input_name ) {
 
-					// Make sure they're integers.
-					$term_ids = array_map( 'intval', $term_ids );
+					case 'userid':
+						$user_id = (int) $input_value;
+						break;
 
-					// Update the terms.
-					wp_set_post_terms( $session_id, $term_ids, $field->inputName );
+					case 'proposal_id':
+						$proposal_id = (int) $input_value;
+						break;
 
+					case 'profile_id':
+						$profile_id = (int) $input_value;
+						break;
+
+					case 'proposal_primary_speaker':
+						$primary_speaker_id = (int) $input_value;
+						break;
+
+					case 'speaker_confirmation':
+						$speaker_confirm = ( 'yes' == $input_value ) ? true : false;
+						break;
+
+					case 'profile_display_name':
+					case 'profile_email':
+					case 'profile_phone':
+					case 'profile_website':
+					case 'profile_content':
+					case 'profile_company':
+					case 'profile_company_website':
+					case 'profile_company_position':
+					case 'profile_linkedin':
+					case 'proposal_title':
+					case 'proposal_content':
+					case 'event_technology':
+					case 'event_video_release':
+					case 'event_special_requests':
+						$entry_info[ $input_name ] = $input_value;
+						break;
+
+					case 'profile_twitter':
+						$entry_info[ $input_name ] = preg_replace( '/[^a-z0-9\_]/i', '', $input_value );
+						break;
+
+					// Use to make sure all names have logic.
+					/*default:
+						echo "<br><br>name: {$input_name}:<pre>";
+						print_r( $input_value );
+						echo "</pre>";
+						break;*/
+
+				}
+			} else {
+
+				switch ( $field->id ) {
+
+					// [label] => Headshot
+					case 53:
+						$entry_info['profile_headshot'] = rgar( $entry, $field['id'] );
+						break;
+
+					// Use to make sure all fields have a name.
+					/*default:
+						echo "NEEDs NAME:<pre>";
+						print_r( $field );
+						echo "</pre>";
+						break;*/
 				}
 			}
 		}
 
-		// Update the speaker post.
-		if ( $speaker_id > 0 && ! empty( $update_speaker_post ) ) {
-
-			// Add the speaker ID.
-			$update_speaker_post['ID']        = $speaker_id;
-			$update_speaker_post['post_type'] = 'speakers';
-
-			// Update the speaker post.
-			wp_update_post( $update_speaker_post );
-
+		if ( empty( $entry_info ) ) {
+			return false;
 		}
 
-		// Update the session post.
-		if ( $session_id > 0 && ! empty( $update_session_post ) ) {
-
-			// Add the session ID.
-			$update_session_post['ID']        = $session_id;
-			$update_session_post['post_type'] = 'proposal';
-
-			// Update the session post.
-			wp_update_post( $update_session_post );
-
+		// No point if no user ID.
+		if ( empty( $user_id ) ) {
+			return false;
 		}
 
-		// Store entry ID in post.
-		update_post_meta( $speaker_id, $speaker_entry_meta_key, $entry_id );
+		// No point if no proposal.
+		if ( empty( $proposal_id ) ) {
+			return false;
+		}
+
+		$proposal_post = wpcampus_speakers()->get_proposal( $proposal_id );
+		if ( empty( $proposal_post->ID ) || $proposal_post->ID != $proposal_id ) {
+			return false;
+		}
+
+		// No point if no profile.
+		if ( empty( $profile_id ) ) {
+			return false;
+		}
+
+		$profile_post = wpcampus_speakers()->get_profile( $profile_id );
+		if ( empty( $profile_post->ID ) || $profile_post->ID != $profile_id ) {
+			return false;
+		}
+
+		// Make sure is admin or WordPress user matches entry user.
+		$can_confirm_proposals = current_user_can( 'confirm_wpc_proposals' );
+		if ( ! $can_confirm_proposals && ( empty( $profile_post->wordpress_user ) || $profile_post->wordpress_user != $user_id ) ) {
+			return false;
+		}
+
+		// Is this the primary speaker?
+		$is_primary_speaker = ! empty( $primary_speaker_id ) && $primary_speaker_id == $profile_post->ID;
+
+		// If primary speaker and didn't confirm, change proposal status.
+		if ( $is_primary_speaker ) {
+
+			if ( $speaker_confirm ) {
+				$new_proposal_status = 'confirmed';
+			} else {
+				$new_proposal_status = 'declined';
+			}
+
+			if ( $new_proposal_status != $proposal_post->proposal_status ) {
+
+				// Update status.
+				if ( $enable_update ) {
+					wpcampus_speakers()->update_proposal_status( $proposal_id, $new_proposal_status );
+				}
+
+				// Mark as changed.
+				$changed[] = array(
+					'field'    => 'proposal_status',
+					'original' => $proposal_post->proposal_status,
+					'new'      => $new_proposal_status,
+				);
+			}
+		}
+
+		$wpcampus_speakers = wpcampus_speakers();
+		$profile_update_fields = array(
+			'profile_first_name' => array(
+				'meta_key'    => 'first_name',
+				'allow_empty' => false,
+				'update'      => array( $wpcampus_speakers, 'update_profile_first_name' ),
+			),
+			'profile_last_name' => array(
+				'meta_key'    => 'last_name',
+				'allow_empty' => false,
+				'update'      => array( $wpcampus_speakers, 'update_profile_last_name' ),
+			),
+			'profile_display_name' => array(
+				'meta_key'    => 'display_name',
+				'allow_empty' => false,
+				'update'      => array( $wpcampus_speakers, 'update_profile_display_name' ),
+			),
+			'profile_email' => array(
+				'meta_key'    => 'email',
+				'allow_empty' => false,
+				'update'      => array( $wpcampus_speakers, 'update_profile_email' ),
+			),
+			'profile_phone' => array(
+				'meta_key'    => 'phone',
+				'allow_empty' => false,
+				'update'      => array( $wpcampus_speakers, 'update_profile_phone' ),
+			),
+			'profile_website' => array(
+				'meta_key'    => 'website',
+				'allow_empty' => true,
+				'update'      => array( $wpcampus_speakers, 'update_profile_website' ),
+			),
+			'profile_company' => array(
+				'meta_key'    => 'company',
+				'allow_empty' => true,
+				'update'      => array( $wpcampus_speakers, 'update_profile_company' ),
+			),
+			'profile_company_website' => array(
+				'meta_key'    => 'company_website',
+				'allow_empty' => true,
+				'update'      => array( $wpcampus_speakers, 'update_profile_company_website' ),
+			),
+			'profile_company_position' => array(
+				'meta_key'    => 'company_position',
+				'allow_empty' => true,
+				'update'      => array( $wpcampus_speakers, 'update_profile_company_position' ),
+			),
+			'profile_twitter' => array(
+				'meta_key'    => 'twitter',
+				'allow_empty' => true,
+				'update'      => array( $wpcampus_speakers, 'update_profile_twitter' ),
+			),
+			'profile_linkedin' => array(
+				'meta_key'    => 'linkedin',
+				'allow_empty' => true,
+				'update'      => array( $wpcampus_speakers, 'update_profile_linkedin' ),
+			),
+		);
+
+		// Update the profile.
+		foreach ( $profile_update_fields as $field => $info ) {
+			if ( ! isset( $entry_info[ $field ] ) ) {
+				continue;
+			}
+			$value = $entry_info[ $field ];
+
+			// Means we don't want to be updated with empty value.
+			if ( ! $info['allow_empty'] && empty( $value ) ) {
+				continue;
+			}
+
+			$meta_key = $info['meta_key'];
+			if ( isset( $profile_post->{$meta_key} ) ) {
+				$original_value = $profile_post->{$meta_key};
+				if ( $value != $original_value ) {
+
+					if ( $enable_update ) {
+						call_user_func( $info['update'], $profile_id, $value );
+					}
+
+					// Mark as changed.
+					$changed[] = array(
+						'field'    => $field,
+						'original' => $original_value,
+						'new'      => $value,
+					);
+				}
+			}
+		}
+
+		$event_profile_fields = array(
+			'event_unavailability' => array(
+				'allow_empty' => true,
+				'get'         => wpcampus_speakers()->get_profile_event_unavailability( $profile_id ),
+				'update'      => array( $wpcampus_speakers, 'update_profile_event_unavailability' ),
+			),
+			'event_coc' => array(
+				'allow_empty' => true,
+				'get'         => wpcampus_speakers()->get_profile_event_coc( $profile_id ),
+				'update'      => array( $wpcampus_speakers, 'update_profile_event_coc' ),
+			),
+			'event_technology' => array(
+				'allow_empty' => true,
+				'get'         => wpcampus_speakers()->get_profile_event_technology( $profile_id ),
+				'update'      => array( $wpcampus_speakers, 'update_profile_event_technology' ),
+			),
+			'event_video_release' => array(
+				'allow_empty' => true,
+				'get'         => wpcampus_speakers()->get_profile_event_video_release( $profile_id ),
+				'update'      => array( $wpcampus_speakers, 'update_profile_event_video_release' ),
+			),
+			'event_special_requests' => array(
+				'allow_empty' => true,
+				'get'         => wpcampus_speakers()->get_profile_event_special_requests( $profile_id ),
+				'update'      => array( $wpcampus_speakers, 'update_profile_event_special_requests' ),
+			),
+		);
+
+		foreach ( $event_profile_fields as $field => $info ) {
+			if ( ! isset( $entry_info[ $field ] ) ) {
+				continue;
+			}
+			$value = $entry_info[ $field ];
+
+			// Means we don't want to be updated with empty value.
+			if ( ! $info['allow_empty'] && empty( $value ) ) {
+				continue;
+			}
+
+			$original_value = $info['get'];
+			if ( $value != $original_value ) {
+
+				if ( $enable_update ) {
+					call_user_func( $info['update'], $profile_id, $value );
+				}
+
+				// Mark as changed.
+				$changed[] = array(
+					'field'    => $field,
+					'original' => $original_value,
+					'new'      => $value,
+				);
+			}
+		}
+
+		// Update profile content.
+		if ( ! empty( $entry_info['profile_content'] ) ) {
+			$value = $entry_info['profile_content'];
+			$original_value = $profile_post->content['raw'];
+			if ( $value != $original_value ) {
+
+				if ( $enable_update ) {
+					wp_update_post( array(
+						'ID'           => $profile_id,
+						'post_content' => wpcampus_speakers()->strip_content_tags( $value ),
+					));
+				}
+
+				// Mark as changed.
+				$changed[] = array(
+					'field'    => 'profile_content',
+					'original' => $original_value,
+					'new'      => $value,
+				);
+			}
+		}
+
+		if ( ! empty( $entry_info['profile_headshot'] ) ) {
+
+			// Headshot path should be the path to a file in the upload directory.
+			$new_headshot_url   = $entry_info['profile_headshot'];
+			$headshot_url_parse = parse_url( $new_headshot_url );
+			$new_headshot_path  = ! empty( $headshot_url_parse['path'] ) ? $headshot_url_parse['path'] : '';
+
+			if ( ! empty( $new_headshot_path ) ) {
+
+				// Check to make sure this hasn't already been processed.
+				$current_headshot_path = get_post_meta( $profile_id, 'gf_profile_headshot', true );
+
+				if ( $new_headshot_path != $current_headshot_path ) {
+
+					if ( $enable_update ) {
+
+						// Check the type of file. We'll use this as the 'post_mime_type'.
+						$filetype = wp_check_filetype( basename( $new_headshot_path ), null );
+
+						// Get the path to the upload directory.
+						$wp_upload_dir = wp_upload_dir();
+
+						// Prepare an array of post data for the attachment.
+						$attachment = array(
+							'guid'           => $wp_upload_dir['url'] . '/' . basename( $new_headshot_path ),
+							'post_mime_type' => $filetype['type'],
+							'post_title'     => $profile_post->title . ' headshot',
+							'post_content'   => '',
+							'post_status'    => 'inherit',
+						);
+
+						// Insert the attachment.
+						$attach_id = wp_insert_attachment( $attachment, $new_headshot_path, $profile_id );
+
+						// Make sure that this file is included, as wp_generate_attachment_metadata() depends on it.
+						require_once( ABSPATH . 'wp-admin/includes/image.php' );
+
+						// Generate the metadata for the attachment, and update the database record.
+						$attach_data = wp_generate_attachment_metadata( $attach_id, $new_headshot_path );
+						wp_update_attachment_metadata( $attach_id, $attach_data );
+
+						set_post_thumbnail( $profile_id, $attach_id );
+
+						// Store alt text.
+						update_post_meta( $attach_id, '_wp_attachment_image_alt', 'Headshot of ' . $profile_post->title );
+
+						// Store used GF headshot path.
+						update_post_meta( $profile_id, 'gf_profile_headshot', $new_headshot_path );
+
+					}
+
+					$changed[] = array(
+						'field'    => 'headshot',
+						'original' => $current_headshot_path,
+						'value'    => $new_headshot_path,
+					);
+				}
+			}
+		}
+
+		// Update proposal if primary speaker.
+		if ( $is_primary_speaker ) {
+
+			$update_proposal_post = array();
+
+			if ( ! empty( $entry_info['proposal_title'] ) ) {
+				$value = $entry_info['proposal_title'];
+				$original_value = $proposal_post->title;
+				if ( $value != $original_value ) {
+
+					$update_proposal_post['post_title'] = $value;
+
+					// Mark as changed.
+					$changed[] = array(
+						'field'    => 'proposal_title',
+						'original' => $original_value,
+						'new'      => $value,
+					);
+				}
+			}
+
+			/*
+			 * @TODO:
+			 */
+			if ( ! empty( $entry_info['proposal_content'] ) ) {
+				$value = $entry_info['proposal_content'];
+				$original_value = $proposal_post->content['raw'];
+				if ( $value != $original_value ) {
+
+					$update_proposal_post['post_content'] = wpcampus_speakers()->strip_content_tags( $value );
+
+					// Mark as changed.
+					$changed[] = array(
+						'field'    => 'proposal_content',
+						'original' => $original_value,
+						'new'      => $value,
+					);
+				}
+			}
+
+			// Update the proposal post.
+			if ( $enable_update && ! empty( $update_proposal_post ) ) {
+				$update_proposal_post['ID'] = $proposal_id;
+				wp_update_post( $update_proposal_post );
+			}
+
+			// Set the taxonomies.
+			$subjects = wp_get_object_terms( $proposal_id, 'subjects', array( 'fields' => 'ids' ) );
+			$subjects_intersect = array_intersect( $subjects, $entry_info['proposal_subjects'] );
+			$subjects_diff = array_merge( array_diff( $subjects, $subjects_intersect ), array_diff( $entry_info['proposal_subjects'], $subjects_intersect ) );
+			if ( ! empty( $subjects_diff ) ) {
+
+				if ( $enable_update ) {
+					wp_set_object_terms( $proposal_id, $entry_info['proposal_subjects'], 'subjects', false );
+				}
+
+				// Mark as changed.
+				$changed[] = array(
+					'field'    => 'proposal_subjects',
+					'original' => $subjects,
+					'new'      => $entry_info['proposal_subjects'],
+				);
+			}
+
+			$technical = wp_get_object_terms( $proposal_id, 'session_technical', array( 'fields' => 'ids' ) );
+			$technical_intersect = array_intersect( $technical, $entry_info['proposal_technical'] );
+			$technical_diff = array_merge( array_diff( $technical, $technical_intersect ), array_diff( $entry_info['proposal_technical'], $technical_intersect ) );
+			if ( ! empty( $technical_diff ) ) {
+
+				if ( $enable_update ) {
+					wp_set_object_terms( $proposal_id, $entry_info['proposal_technical'], 'session_technical', false );
+				}
+
+				// Mark as changed.
+				$changed[] = array(
+					'field'    => 'proposal_technical',
+					'original' => $technical,
+					'new'      => $entry_info['proposal_technical'],
+				);
+			}
+
+			// TODO: Do we need this?
+			// Set the "other" categories for the session.
+			/*if ( ! empty( $session['other_categories'] ) ) {
+
+				// Convert to array.
+				$other_categories = explode( ',', $session['other_categories'] );
+				if ( ! empty( $other_categories ) ) {
+
+					// Will hold final term IDs.
+					$other_category_ids = array();
+
+					// Add term.
+					foreach ( $other_categories as $new_term_string ) {
+
+						// Create the term.
+						$new_term = wp_insert_term( $new_term_string, 'session_categories' );
+						if ( ! is_wp_error( $new_term ) && ! empty( $new_term['term_id'] ) ) {
+
+							// Add to list to assign later.
+							$other_category_ids[] = $new_term['term_id'];
+
+						}
+					}
+
+					// Assign all new categories to session.
+					if ( ! empty( $other_category_ids ) ) {
+						wp_set_object_terms( $schedule_post_id, $other_category_ids, 'session_categories', false );
+					}
+				}
+			}*/
+		}
+
+		// Add a timestamp and store what changed.
+		if ( ! empty( $changed ) ) {
+
+			$time            = time();
+			$changed['time'] = $time;
+
+			if ( $enable_update ) {
+				add_post_meta( $proposal_id, "changed_{$time}", $changed, false );
+				add_post_meta( $profile_id, "changed_{$time}", $changed, false );
+			}
+		}
+
+		if ( $debug_update ) {
+
+			echo "<br>User ID: {$user_id}";
+			echo "<br>Primary speaker ID: {$primary_speaker_id}";
+			echo "<br>Proposal ID: {$proposal_id}";
+			echo "<br>Profile ID: {$profile_id}";
+			echo "<br>Speaker confirm: {$speaker_confirm}";
+
+			echo "<br><br>Proposal:<pre>";
+			print_r( $proposal_post );
+			echo "</pre>";
+
+			echo "<br><br>Profile:<pre>";
+			print_r( $profile_post );
+			echo "</pre>";
+
+			echo "<br><br>Entry:<pre>";
+			print_r( $entry_info );
+			echo "</pre>";
+
+			echo "<br><br>What changed:<pre>";
+			print_r( $changed );
+			echo "</pre>";
+			exit;
+		}
 
 		return true;
 	}

@@ -6,7 +6,7 @@
  * @category    Class
  * @package     WPCampus Speakers
  */
-class WPCampus_Speakers_Admin {
+final class WPCampus_Speakers_Admin {
 
 	/**
 	 * We don't need to instantiate this class.
@@ -19,11 +19,15 @@ class WPCampus_Speakers_Admin {
 	public static function register() {
 		$plugin = new self();
 
+		// Enqueue admin styles and scripts.
+		add_action( 'admin_enqueue_scripts', array( $plugin, 'enqueue_styles_scripts' ) );
+
 		// Print styles in the admin <head>.
 		add_action( 'admin_print_styles-edit.php', array( $plugin, 'print_styles' ) );
 
 		// Add items to the admin menu.
-		add_action( 'admin_menu', array( $plugin, 'add_menu_pages' ) );
+		add_action( 'admin_menu', array( $plugin, 'add_menu_pages' ), 5 );
+		add_action( 'admin_menu', array( $plugin, 'add_menu_subpages' ), 10 );
 		add_action( 'parent_file', array( $plugin, 'filter_submenu_parent' ) );
 
 		// Add and populate custom columns.
@@ -44,7 +48,6 @@ class WPCampus_Speakers_Admin {
 		// Add/remove meta boxes.
 		add_action( 'add_meta_boxes', array( $plugin, 'add_meta_boxes' ), 10, 2 );
 		add_action( 'admin_menu', array( $plugin, 'remove_meta_boxes' ) );
-		add_action( 'edit_form_after_title', array( $plugin, 'print_meta_boxes_after_title' ), 0 );
 
 		// Add instructions to thumbnail admin meta box.
 		add_filter( 'admin_post_thumbnail_html', array( $plugin, 'filter_admin_post_thumbnail_html' ), 100, 2 );
@@ -110,6 +113,17 @@ class WPCampus_Speakers_Admin {
 	}*/
 
 	/**
+	 * Enqueue admin styles and scripts.
+	 */
+	public function enqueue_styles_scripts( $hook_suffix ) {
+
+		// Only for the proposal review page
+		if ( in_array( $hook_suffix, array( 'sessions_page_wpc-proposal-select', 'sessions_page_wpc-proposal-review' ) ) ) {
+			wpcampus_speakers()->load_review_assets();
+		}
+	}
+
+	/**
 	 * Print custom styles in the admin <head>.
 	 */
 	public function print_styles() {
@@ -140,20 +154,46 @@ class WPCampus_Speakers_Admin {
 	}
 
 	/**
-	 * Add pages to the admin.
+	 * Add the main speaker page to the admin.
+	 *
+	 * Set as priority 9 or higher so our speaker and profile
+	 * post types can be added as subpages to this page.
 	 */
 	public function add_menu_pages() {
 		$plugin = new self();
 
 		// Add menu section to manage all of the speaker information.
-		add_menu_page( __( 'Speakers', 'wpcampus' ), __( 'Speakers', 'wpcampus' ), 'manage_wpc_speakers', 'wpc-speakers', array( $plugin, 'print_speakers_main_page' ), 'dashicons-megaphone', 22 );
+		add_menu_page( sprintf( __( '%s: Sessions', 'wpcampus' ), 'WPCampus' ), __( 'Sessions', 'wpcampus' ), 'view_wpc_proposals', 'wpc-sessions', array( $plugin, 'print_main_sessions_page' ), 'dashicons-megaphone', 22 );
+
+		add_submenu_page( 'wpc-sessions', sprintf( __( '%s: Speakers', 'wpcampus' ), 'WPCampus' ), __( 'Speakers', 'wpcampus' ), 'view_wpc_profiles', 'wpc-speakers', array( $plugin, 'print_main_speakers_page' ) );
+		add_submenu_page( 'wpc-sessions', sprintf( __( '%s: Review Proposals', 'wpcampus' ), 'WPCampus' ), __( 'Review Proposals', 'wpcampus' ), 'review_wpc_proposals', 'wpc-proposal-review', array( $plugin, 'print_proposals_review_page' ) );
+		add_submenu_page( 'wpc-sessions', sprintf( __( '%s: Select Proposals', 'wpcampus' ), 'WPCampus' ), __( 'Select Proposals', 'wpcampus' ), 'review_wpc_proposals', 'wpc-proposal-select', array( $plugin, 'print_proposals_select_page' ) );
+
+	}
+
+	/**
+	 * Add subpages to our speakers admin menu.
+	 *
+	 * Separating out subpages to lower priority so
+	 * speakers and profiles are listed higher in the menu.
+	 */
+	public function add_menu_subpages() {
 
 		// Add taxonomy pages under speakers.
-		add_submenu_page( 'wpc-speakers', __( 'Events', 'wpcampus' ), __( 'Events', 'wpcampus' ), 'manage_categories', 'edit-tags.php?taxonomy=proposal_event&section=wpc-speakers' );
-		add_submenu_page( 'wpc-speakers', __( 'Session Types', 'wpcampus' ), __( 'Session Types', 'wpcampus' ), 'manage_categories', 'edit-tags.php?taxonomy=session_type&section=wpc-speakers' );
-		add_submenu_page( 'wpc-speakers', __( 'Subjects', 'wpcampus' ), __( 'Subjects', 'wpcampus' ), 'manage_categories', 'edit-tags.php?taxonomy=subjects&section=wpc-speakers' );
-		add_submenu_page( 'wpc-speakers', __( 'Technical Levels', 'wpcampus' ), __( 'Technical Levels', 'wpcampus' ), 'manage_categories', 'edit-tags.php?taxonomy=session_technical&section=wpc-speakers' );
+		add_submenu_page( 'wpc-sessions', __( 'Events', 'wpcampus' ), __( 'Events', 'wpcampus' ), 'manage_wpc_speakers', 'edit-tags.php?taxonomy=proposal_event&section=wpc-sessions' );
+		add_submenu_page( 'wpc-sessions', __( 'Session Formats', 'wpcampus' ), __( 'Session Formats', 'wpcampus' ), 'manage_wpc_speakers', 'edit-tags.php?taxonomy=session_format&section=wpc-sessions' );
+		add_submenu_page( 'wpc-sessions', __( 'Subjects', 'wpcampus' ), __( 'Subjects', 'wpcampus' ), 'manage_wpc_speakers', 'edit-tags.php?taxonomy=subjects&section=wpc-sessions' );
+		add_submenu_page( 'wpc-sessions', __( 'Technical Levels', 'wpcampus' ), __( 'Technical Levels', 'wpcampus' ), 'manage_wpc_speakers', 'edit-tags.php?taxonomy=session_technical&section=wpc-sessions' );
 
+		if ( function_exists( 'acf_add_options_page' ) ) {
+			acf_add_options_page( array(
+				'page_title'  => 'Settings',
+				'menu_title'  => 'Settings',
+				'parent_slug' => 'wpc-sessions',
+				'menu_slug'   => 'wpc-sessions-settings',
+				'capability'  => 'manage_options',
+			));
+		}
 	}
 
 	/**
@@ -169,19 +209,14 @@ class WPCampus_Speakers_Admin {
 		$current_screen = get_current_screen();
 
 		// Show taxonomies under "Speakers" menu.
-		if ( ! empty( $current_screen->taxonomy ) && in_array( $current_screen->taxonomy, array( 'proposal_event', 'session_type', 'subjects' ) ) ) {
-			if ( isset( $_GET['section'] ) && 'wpc-speakers' == $_GET['section'] ) {
+		if ( ! empty( $current_screen->taxonomy ) && in_array( $current_screen->taxonomy, array( 'proposal_event', 'session_format', 'subjects' ) ) ) {
+			if ( isset( $_GET['section'] ) && 'wpc-sessions' == $_GET['section'] ) {
 				return $_GET['section'];
 			}
 		}
 
 		return $parent_file;
 	}
-
-	/**
-	 * Print the main page of the speakers section.
-	 */
-	public function print_speakers_main_page() {}
 
 	/**
 	 * Used in admin to add custom columns.
@@ -241,6 +276,7 @@ class WPCampus_Speakers_Admin {
 		return $this->add_admin_columns( $columns, array(
 			'proposal_status'  => __( 'Status', 'wpcampus' ),
 			'proposal_speaker' => __( 'Speaker(s)', 'wpcampus' ),
+			'proposal_format'  => __( 'Format(s)', 'wpcampus' ),
 			'proposal_assets'  => __( 'Asset(s)', 'wpcampus' ),
 		));
 	}
@@ -333,6 +369,7 @@ class WPCampus_Speakers_Admin {
 	 * Populate our custom proposal columns.
 	 */
 	public function populate_proposal_columns( $column, $post_id ) {
+		$helper = wpcampus_speakers();
 
 		switch ( $column ) {
 
@@ -347,55 +384,46 @@ class WPCampus_Speakers_Admin {
 				 *  - selected
 				 *  - submitted (default, if blank)
 				 */
-				$proposal_status = wpcampus_speakers()->get_proposal_status( $post_id );
+				$proposal_status = $helper->get_proposal_status( $post_id );
 
 				// Print status.
-				wpcampus_speakers()->print_proposal_status_label( $post_id, $proposal_status );
-
-				// Add link to confirmation form if not confirmed by speaker.
-				if ( ! wpcampus_speakers()->has_proposal_been_confirmed( $post_id, $proposal_status ) ) :
-
-					$proposal_confirmation_url = wpcampus_speakers()->get_proposal_confirmation_url( $post_id, true );
-					if ( ! empty( $proposal_confirmation_url ) ) :
-
-						?>
-						<br><a style="text-decoration:underline;" href="<?php echo $proposal_confirmation_url; ?>" target="_blank"><?php _e( 'Confirmation', 'wpcampus-speakers' ); ?></a><br>
-						<?php
-					endif;
-				endif;
+				$helper->print_proposal_status_label( $post_id, $proposal_status );
 
 				break;
 
 			case 'proposal_speaker':
 
-				$speaker_ids = wpcampus_speakers()->get_proposal_speaker_ids( $post_id );
+				// Get for each speaker.
+				$profiles = $helper->get_profiles(array(
+					'by_proposal' => $post_id,
+				));
 
-				if ( ! empty( $speaker_ids ) ) :
+				$proposal_status = $helper->get_proposal_status( $post_id );
+
+				if ( ! empty( $profiles ) ) :
 
 					$speaker_count = 0;
 
-					foreach ( $speaker_ids as $speaker_id ) :
+					foreach ( $profiles as $profile ) :
 
-						$speaker_id = ! empty( $speaker_id ) && is_numeric( $speaker_id ) ? (int) $speaker_id : 0;
-						if ( $speaker_id > 0 ) :
+						// Setup the filter URL.
+						// @TODO: Not sanitized.
+						$filters = $_GET;
+						$filters['proposal_speaker'] = $profile->ID;
+						$filter_url = add_query_arg( $filters, 'edit.php' );
 
-							$speaker_display_name = get_post_meta( $speaker_id, 'display_name', true );
-							if ( ! empty( $speaker_display_name ) ) :
+						echo $speaker_count > 0 ? '<br />' : null;
 
-								// Setup the filter URL.
-								// @TODO: Not sanitized.
-								$filters = $_GET;
-								$filters['proposal_speaker'] = $speaker_id;
-								$filter_url = add_query_arg( $filters, 'edit.php' );
+						?>
+						<a href="<?php echo $filter_url; ?>"><?php echo $profile->display_name; ?></a><br><a style="text-decoration:underline;" href="<?php echo get_edit_post_link( $profile->ID ); ?>"><?php _e( 'Edit', 'wpcampus' ); ?></a>
+						<?php
 
-								echo $speaker_count > 0 ? '<br />' : null;
-
-								?>
-								<a href="<?php echo $filter_url; ?>"><?php echo $speaker_display_name; ?></a> (<a href="<?php echo get_edit_post_link( $speaker_id ); ?>"><?php _e( 'Edit', 'wpcampus' ); ?></a>)
-								<?php
-
+						if ( in_array( $proposal_status, array( 'selected' ) ) ) {
+							$proposal_confirmation_url = $helper->get_proposal_confirmation_url( $post_id, $profile->ID );
+							if ( ! empty( $proposal_confirmation_url ) ) :
+								?>/ <a style="text-decoration:underline;" href="<?php echo $proposal_confirmation_url; ?>" target="_blank"><strong><?php _e( 'Confirm', 'wpcampus-speakers' ); ?></strong></a><?php
 							endif;
-						endif;
+						}
 
 						$speaker_count++;
 
@@ -403,11 +431,39 @@ class WPCampus_Speakers_Admin {
 				endif;
 				break;
 
+			case 'proposal_format':
+
+				$is_selected = false;
+
+				$formats = get_the_terms( $post_id, 'session_format' );
+				if ( ! empty( $formats ) ) {
+					$is_selected = true;
+				} else {
+					$formats = get_the_terms( $post_id, 'preferred_session_format' );
+				}
+
+				if ( ! empty( $formats ) ) {
+
+					$format_str = array_map( function($a) {
+						return $a->name;
+					}, $formats );
+
+					if ( ! $is_selected ) {
+						echo '<em>' . implode( '<br>', $format_str ) . '</em>';
+					} else {
+						echo implode( '<br>', $format_str );
+					}
+
+					break;
+				}
+
+				break;
+
 			case 'proposal_assets':
 
 				// Get the video.
-				$proposal_video_id  = wpcampus_speakers()->get_proposal_video_id( $post_id );
-				$proposal_video_url = wpcampus_speakers()->get_proposal_video_url( $post_id, $proposal_video_id );
+				$proposal_video_id  = $helper->get_proposal_video_id( $post_id );
+				$proposal_video_url = $helper->get_proposal_video_url( $post_id, $proposal_video_id );
 
 				if ( empty( $proposal_video_id ) && empty( $proposal_video_url ) ) :
 					?>
@@ -436,10 +492,10 @@ class WPCampus_Speakers_Admin {
 					endif;
 				endif;
 
-				echo '<br><br>';
+				echo '<br>';
 
 				// Get the slides.
-				$session_slides_url = wpcampus_speakers()->get_proposal_slides_url( $post_id );
+				$session_slides_url = $helper->get_proposal_slides_url( $post_id );
 
 				if ( empty( $session_slides_url ) ) :
 					?>
@@ -505,18 +561,18 @@ class WPCampus_Speakers_Admin {
 		}
 
 		// @TODO: Only add for confirmed proposals who have been selected?
-		$proposal_status = wpcampus_speakers()->get_proposal_status( $post->ID );
+		/*$proposal_status = wpcampus_speakers()->get_proposal_status( $post->ID );
 		if ( 'confirmed' != $proposal_status ) {
 			return $actions;
-		}
+		}*/
 
 		// Only for proposals assigned to an event.
-		$events = wp_get_object_terms( $post->ID, 'proposal_event', array( 'fields' => 'ids' ) );
+		/*$events = wp_get_object_terms( $post->ID, 'proposal_event', array( 'fields' => 'ids' ) );
 		if ( empty( $events ) ) {
 			return $actions;
-		}
+		}*/
 
-		$permalink = wpcampus_speakers()->get_session_permalink( $post->ID );
+		$permalink = get_permalink( $post->ID );
 		if ( empty( $permalink ) ) {
 			return $actions;
 		}
@@ -545,6 +601,18 @@ class WPCampus_Speakers_Admin {
 			'selected'  => array(
 				//'count' => 0,
 				'label' => __( 'Selected', 'wpcampus' ),
+			),
+			'backup'  => array(
+				//'count' => 0,
+				'label' => __( 'Backup', 'wpcampus' ),
+			),
+			'maybe'  => array(
+				//'count' => 0,
+				'label' => __( 'Maybe', 'wpcampus' ),
+			),
+			'no'  => array(
+				//'count' => 0,
+				'label' => __( 'No', 'wpcampus' ),
 			),
 			'submitted' => array(
 				//'count' => 0,
@@ -655,22 +723,12 @@ class WPCampus_Speakers_Admin {
 					'high'
 				);
 
-				// Print instructions.
-				add_meta_box(
-					'wpcampus-proposal-instructions',
-					sprintf( __( '%s: How To Manage Proposals', 'wpcampus' ), 'WPCampus' ),
-					array( $this, 'print_meta_boxes' ),
-					$post_type,
-					'wpc_after_title',
-					'high'
-				);
-
 				// Add a meta box to link to the session info.
 				$speaker_ids = wpcampus_speakers()->get_proposal_speaker_ids( $post->ID );
 				if ( ! empty( $speaker_ids ) ) {
 					add_meta_box(
-						'wpcampus-edit-profiles',
-						sprintf( __( '%s: Edit Speaker(s)', 'wpcampus' ), 'WPCampus' ),
+						'wpcampus-proposal-actions',
+						sprintf( __( '%s: Actions', 'wpcampus' ), 'WPCampus' ),
 						array( $this, 'print_meta_boxes' ),
 						$post_type,
 						'side',
@@ -722,17 +780,6 @@ class WPCampus_Speakers_Admin {
 	}
 
 	/**
-	 * Print meta boxes after the title, before the editor.
-	 */
-	public function print_meta_boxes_after_title() {
-		global $post, $wp_meta_boxes;
-
-		do_meta_boxes( get_current_screen(), 'wpc_after_title', $post );
-
-		unset( $wp_meta_boxes['post']['wpc_after_title'] );
-	}
-
-	/**
 	 * Prints the content in our custom admin meta boxes.
 	 */
 	public function print_meta_boxes( $post, $metabox ) {
@@ -747,8 +794,8 @@ class WPCampus_Speakers_Admin {
 				$this->print_proposal_slug_mb( $post );
 				break;
 
-			case 'wpcampus-edit-profiles':
-				$this->print_edit_profiles_mb( $metabox['args'] );
+			case 'wpcampus-proposal-actions':
+				$this->print_proposal_actions_mb( $post->ID, $metabox['args'] );
 				break;
 
 			case 'wpcampus-speakers-proposal':
@@ -803,6 +850,28 @@ class WPCampus_Speakers_Admin {
 	 */
 	public function print_proposal_slug_mb( $post ) {
 
+		// Check to make sure proposal has a slug.
+		if ( empty( $post->post_name ) && ! empty( $post->post_title ) ) {
+
+			$post_name = sanitize_title_with_dashes( $post->post_title );
+			if ( ! empty( $post_name ) ) {
+
+				$post_name = wp_unique_post_slug( $post_name, $post->ID, $post->post_status, $post->post_type, $post->post_parent );
+
+				if ( ! empty( $post_name ) ) {
+
+					$update = wp_update_post( array(
+						'ID'        => $post->ID,
+						'post_name' => $post_name,
+					));
+
+					if ( $update == $post->ID ) {
+						$post->post_name = $post_name;
+					}
+				}
+			}
+		}
+
 		?>
 		<style type="text/css">
 			#wpcampus-proposal-slug { margin: 15px 0 0px 0; }
@@ -817,15 +886,15 @@ class WPCampus_Speakers_Admin {
 	}
 
 	/**
-	 * Print the "Edit Profiles" meta box which
-	 * has buttons to easily edit the session
-	 * and clear the cache.
+	 * Print the proposal actions.
 	 */
-	public function print_edit_profiles_mb( $args = array() ) {
+	public function print_proposal_actions_mb( $proposal_id, $args = array() ) {
 		$profiles = ! empty( $args['profiles'] ) ? $args['profiles'] : array();
 		if ( ! empty( $profiles ) ) :
+			$view_url = get_permalink( $proposal_id );
 			?>
 			<div style="background:rgba(0,115,170,0.07);padding:13px 18px 15px;color:#000;margin:-6px -12px -12px -12px;">
+				<a class="button button-primary button-large" style="display:block;text-align:center;margin:5px 0;" href="<?php echo $view_url; ?>" target="_blank"><?php _e( 'View session', 'wpcampus-speakers' ); ?></a>
 				<?php
 
 				foreach ( $profiles as $profile_id ) :
@@ -834,7 +903,7 @@ class WPCampus_Speakers_Admin {
 					$display_name = get_post_meta( $profile_id, 'display_name', true );
 
 					?>
-					<a class="button button-primary button-large" style="display:block;text-align:center;margin:5px 0;" href="<?php echo $edit_url; ?>" target="_blank"><?php printf( __( 'Edit %s', 'wpcampus-speakers' ), $display_name ); ?></a>
+					<a class="button button-secondary button-large" style="display:block;text-align:center;margin:5px 0;" href="<?php echo $edit_url; ?>" target="_blank"><?php printf( __( 'Edit %s', 'wpcampus-speakers' ), $display_name ); ?></a>
 					<?php
 				endforeach;
 
@@ -849,6 +918,8 @@ class WPCampus_Speakers_Admin {
 	 */
 	public function print_speaker_proposals_table( $speaker_id ) {
 		global $wpdb;
+
+		$helper = wpcampus_speakers();
 
 		$proposals = $wpdb->get_results(
 			$wpdb->prepare( "SELECT ID, post_title, post_status,
@@ -905,7 +976,7 @@ class WPCampus_Speakers_Admin {
 						<td>
 							<?php
 
-							wpcampus_speakers()->print_proposal_status_label( $proposal->ID, $proposal->proposal_status );
+							$helper->print_proposal_status_label( $proposal->ID, $proposal->proposal_status );
 
 							if ( 'publish' != $proposal->post_status ) {
 								echo " <strong>({$proposal->post_status})</strong>";
@@ -939,7 +1010,7 @@ class WPCampus_Speakers_Admin {
 							<?php
 
 							// Gets this proposal's speaker IDs.
-							$proposal_speaker_ids = wpcampus_speakers()->get_proposal_speaker_ids( $proposal->ID );
+							$proposal_speaker_ids = $helper->get_proposal_speaker_ids( $proposal->ID );
 
 							if ( ! empty( $proposal_speaker_ids ) ) :
 
@@ -1008,6 +1079,8 @@ class WPCampus_Speakers_Admin {
 	 */
 	public function print_proposal_speaker_details( $post_id ) {
 
+		$helper = wpcampus_speakers();
+
 		// Get the information.
 		$technology = get_post_meta( $post_id, 'wpc_speaker_technology', true );
 		$video_release = get_post_meta( $post_id, 'wpc_speaker_video_release', true );
@@ -1020,18 +1093,31 @@ class WPCampus_Speakers_Admin {
 			<strong><?php _e( 'Status:', 'wpcampus' ); ?></strong><br />
 			<?php
 
-			$proposal_status = wpcampus_speakers()->get_proposal_status( $post_id );
+			$proposal_status = $helper->get_proposal_status( $post_id );
 
 			// Print the proposal's status.
-			wpcampus_speakers()->print_proposal_status_label( $post_id, $proposal_status );
+			$helper->print_proposal_status_label( $post_id, $proposal_status );
 
 			// Print confirmation URL no matter what for admin sake.
-			$proposal_confirmation_url = wpcampus_speakers()->get_proposal_confirmation_url( $post_id, true );
-			if ( ! empty( $proposal_confirmation_url ) ) :
+			if ( in_array( $proposal_status, array( 'selected', 'declined', 'confirmed' ) ) ) :
 
-				?>
-				<br><a href="<?php echo $proposal_confirmation_url; ?>" target="_blank"><?php _e( 'Confirmation form', 'wpcampus-speakers' ); ?></a>
-				<?php
+				// Get for each speaker.
+				$profiles = $helper->get_profiles(array(
+					'by_proposal' => $post_id,
+				));
+
+				if ( ! empty( $profiles ) ) :
+					foreach ( $profiles as $profile ) :
+
+						$proposal_confirmation_url = $helper->get_proposal_confirmation_url( $post_id, $profile->ID );
+						if ( ! empty( $proposal_confirmation_url ) ) :
+
+							?>
+							<br><a href="<?php echo $proposal_confirmation_url; ?>" target="_blank"><?php printf( __( 'Confirmation form for %s', 'wpcampus-speakers' ), $profile->title ); ?></a>
+							<?php
+						endif;
+					endforeach;
+				endif;
 			endif;
 
 			?>
@@ -1054,7 +1140,7 @@ class WPCampus_Speakers_Admin {
 	public function print_proposal_submission_details( $post_id ) {
 
 		// Get the information.
-		$entry_id = (int) get_post_meta( $post_id, 'gf_entry_id', true );
+		$entry_id = wpcampus_speakers()->get_proposal_gf_entry_id( $post_id );
 
 		if ( empty( $entry_id ) ) :
 			?>
@@ -1079,93 +1165,197 @@ class WPCampus_Speakers_Admin {
 	}
 
 	/**
-	 * Creates CSV of speakers information.
+	 * Print the main page of the speakers section.
+	 */
+	public function print_main_sessions_page() {
+		?>
+		<div class="wrap">
+			<h1><?php echo get_admin_page_title(); ?></h1>
+			<p><em>Coming soon.</em></p>
+		</div>
+		<?php
+	}
+
+	/**
 	 *
-	 * @TODO:
-	 * - Update to work with new system.
+	 */
+	public function print_main_speakers_page() {
+		$helper = wpcampus_speakers();
 
-	public function create_speakers_csv() {
+		$event_id = $helper->get_proposal_event();
+		$event = $event_id > 0 ? get_term( $event_id, 'proposal_event' ) : null;
 
-		// Get the speakers.
-		$speakers = get_posts( array(
-			'posts_per_page'    => -1,
-			'orderby'           => 'title',
-			'order'             => 'ASC',
-			'post_type'         => 'speakers',
-			'post_status'       => 'publish',
-			'suppress_filters'  => false,
-		));
+		if ( $event_id > 0 ) {
+			$event = get_term( $event_id, 'proposal_event' );
+		}
 
-		// Create array for CSV.
-		$speakers_csv = array();
+		?>
+		<div class="wrap">
+			<h1><?php echo get_admin_page_title(); ?></h1>
+			<?php
 
-		foreach ( $speakers as $speaker ) {
+			if ( ! empty( $event->name ) ) :
+				?>
+				<h2><?php echo $event->name; ?></h2>
+				<?php
+			endif;
 
-			// Will hold feedback URL(s).
-			$session_titles = array();
-			$feedback_urls = array();
+			if ( current_user_can( 'download_wpc_profile_csv' ) ) :
 
-			// Get the speaker.
-			$the_speaker = class_exists( 'Conference_Schedule_Speaker' ) ? new Conference_Schedule_Speaker( $speaker->ID ) : null;
-			if ( $the_speaker ) {
+				$admin_url = add_query_arg( 'page', 'wpc-speakers', admin_url( 'admin.php' ) );
 
-				// Get speaker events.
-				$speaker_events = $the_speaker->get_events();
-				if ( ! empty( $speaker_events ) ) {
+				$all_confirmed_speakers_mailchimp_url = add_query_arg( array(
+					'proposal_status'    => 'confirmed',
+					'proposal_event'     => 'all',
+					'confirmation_email' => 1,
+				), $admin_url );
 
-					foreach ( $speaker_events as $event ) {
+				$confirmed_speakers_mailchimp_url = add_query_arg( array(
+					'proposal_status'    => 'confirmed',
+					'confirmation_email' => 1,
+				), $admin_url );
 
-						// Add the title.
-						$session_titles[] = $event->post_title;
+				$selected_speakers_mailchimp_url = add_query_arg( array(
+					'proposal_status'    => 'selected,declined,confirmed',
+					'confirmation_email' => 1,
+				), $admin_url );
 
-						// Get the feedback URL.
-						$feedback_url = get_post_meta( $event->ID, 'conf_sch_event_feedback_url', true );
+				$selected_speakers_only_mailchimp_url = add_query_arg( array(
+					'proposal_status'    => 'selected',
+					'confirmation_email' => 1,
+				), $admin_url );
 
-						// Filter the feedback URL.
-						$feedback_url = apply_filters( 'conf_sch_feedback_url', $feedback_url, $event );
+				$declined_speakers_mailchimp_url = add_query_arg( array(
+					'proposal_status'    => 'not_selected',
+					'confirmation_email' => 1,
+				), $admin_url );
 
-						if ( ! empty( $feedback_url ) ) {
-							$feedback_urls[] = $feedback_url;
-						}
+				$all_confirmed_speakers_mailchimp_csv = wp_nonce_url( $all_confirmed_speakers_mailchimp_url, 'download_profile_csv', 'download_profile_csv_nonce' );
+				$confirmed_speakers_mailchimp_csv = wp_nonce_url( $confirmed_speakers_mailchimp_url, 'download_profile_csv', 'download_profile_csv_nonce' );
+				$selected_speakers_mailchimp_csv = wp_nonce_url( $selected_speakers_mailchimp_url, 'download_profile_csv', 'download_profile_csv_nonce' );
+				$selected_speakers_only_mailchimp_csv = wp_nonce_url( $selected_speakers_only_mailchimp_url, 'download_profile_csv', 'download_profile_csv_nonce' );
+				$declined_speakers_mailchimp_csv = wp_nonce_url( $declined_speakers_mailchimp_url, 'download_profile_csv', 'download_profile_csv_nonce' );
+
+				$download_profile_headshots_url = add_query_arg( array(
+					'proposal_status'            => 'selected,confirmed',
+					'download_profile_headshots' => 1,
+				), $admin_url );
+
+				$download_profile_headshots_csv = wp_nonce_url( $download_profile_headshots_url, 'download_profile_headshots', 'download_profile_headshots_nonce' );
+
+				?>
+				<h3>Download Speaker Information</h3>
+				<ul class="wpc-list">
+					<li><a href="<?php echo $all_confirmed_speakers_mailchimp_csv; ?>">Download speaker information for confirmed proposals for ALL events</a></li>
+					<li><a href="<?php echo $confirmed_speakers_mailchimp_csv; ?>">Download speaker information for confirmed proposals</a></li>
+					<li><a href="<?php echo $selected_speakers_mailchimp_csv; ?>">Download speaker information for selected, confirmed, and declined proposals</a></li>
+					<li><a href="<?php echo $selected_speakers_only_mailchimp_csv; ?>">Download speaker information for selected proposals</a></li>
+					<li><a href="<?php echo $declined_speakers_mailchimp_csv; ?>">Download speaker information for proposals that were not selected (and where speakers were not selected at all)</a></li>
+					<li><a href="<?php echo $download_profile_headshots_csv; ?>">Download speaker headshots</a></li>
+				</ul>
+				<?php /*<ul class="wpc-list">
+					<li><a href="<?php echo $confirmed_speakers_csv; ?>">Download confirmed speaker information</a></li>
+					<li><a href="<?php echo $selected_speakers_csv; ?>">Download selected speaker information</a></li>
+				</ul>
+				<ul class="wpc-list">
+					<li><a href="<?php echo $declined_speakers_csv; ?>">Download declined speaker information</a></li>
+					<li><a href="<?php echo $backup_speakers_csv; ?>">Download backup speaker information</a></li>
+					<li><a href="<?php echo $maybe_speakers_csv; ?>">Download maybe speaker information</a></li>
+					<li><a href="<?php echo $no_speakers_csv; ?>">Download no speaker information</a></li>
+				</ul>
+				<ul class="wpc-list">
+					<li><a href="<?php echo $all_speakers_csv; ?>">Download all speaker information</a></li>
+				</ul>*/ ?>
+				<style type="text/css">
+					ul.wpc-list {
+						list-style: disc;
+						margin: 0 0 1.5em 2em;
 					}
-				}
-			}
+					ul.wpc-list li {
+						margin: 2px 0;
+					}
+				</style>
+				<?php
+			endif;
 
-			$speakers_csv[] = array(
-				$speaker->post_title,
-				implode( ', ', $session_titles ),
-				$speaker->post_content,
-				implode( ', ', $feedback_urls ),
-			);
-		}
+			if ( current_user_can( 'view_wpc_profile_emails' ) ) :
 
-		// Create temporary CSV file for the complete photo list.
-		$csv_speakers_filename = 'wpcampus-2017-speakers.csv';
-		$csv_speakers_file_path = "/tmp/{$csv_speakers_filename}";
-		$csv_speakers_file = fopen( $csv_speakers_file_path, 'w' );
+				$confirmed_emails = $helper->get_profile_emails( array( 'proposal_status' => 'confirmed' ) );
 
-		// Add headers.
-		fputcsv( $csv_speakers_file, array( 'Name', 'Session', 'Intro', 'Feedback' ) );
+				?>
+				<h3>Email address(es) for selected speakers who <strong>have</strong> confirmed (<?php echo count( $confirmed_emails ); ?>)</h3>
+				<p style="width:100%;word-wrap:break-word;"><?php echo implode( ',', $confirmed_emails ); ?></p>
+				<?php
 
-		// Write image info to the file.
-		foreach ( $speakers_csv as $speaker ) {
-			fputcsv( $csv_speakers_file, $speaker );
-		}
+				$not_confirmed_emails = $helper->get_profile_emails( array( 'proposal_status' => 'selected' ) );
 
-		// Close the file.
-		fclose( $csv_speakers_file );
+				?>
+				<h3>Email address(es) for selected speakers who <strong>have not</strong> confirmed (<?php echo count( $not_confirmed_emails ); ?>)</h3>
+				<p style="width:100%;word-wrap:break-word;"><?php echo implode( ',', $not_confirmed_emails ); ?></p>
+				<?php
 
-		// Output headers so that the file is downloaded rather than displayed.
-		header( 'Content-type: text/csv' );
-		header( "Content-disposition: attachment; filename = {$csv_speakers_filename}" );
-		header( 'Content-Length: ' . filesize( $csv_speakers_file_path ) );
-		header( 'Pragma: no-cache' );
-		header( 'Expires: 0' );
+				$not_selected_emails = $helper->get_profile_emails( array( 'proposal_status' => 'not_selected' ) );
 
-		// Read the file.
-		readfile( $csv_speakers_file_path );
+				?>
+				<h3>Email address(es) for speakers who were not selected (<?php echo count( $not_selected_emails ); ?>)</h3>
+				<p style="width:100%;word-wrap:break-word;"><?php echo implode( ',', $not_selected_emails ); ?></p>
+				<?php
 
-		exit;
-	}*/
+				$submitted_emails = $helper->get_profile_emails();
+
+				?>
+				<h3>Email address(es) for people who submitted proposals (<?php echo count( $submitted_emails ); ?>)</h3>
+				<p style="width:100%;word-wrap:break-word;"><?php echo implode( ',', $submitted_emails ); ?></p>
+				<?php
+			endif;
+
+			?>
+		</div>
+		<?php
+	}
+
+	/**
+	 *
+	 */
+	public function print_proposals_review_page() {
+
+		$event_id = wpcampus_speakers()->get_proposal_event();
+		$event = $event_id > 0 ? get_term( $event_id, 'proposal_event' ) : null;
+
+		?>
+		<div class="wrap">
+			<div class="wpc-proposals-table-header">
+				<h1><?php echo get_admin_page_title(); ?></h1>
+				<button class="button button-primary wpc-proposals-table-update wpc-proposals-table-update-all">Update all tables</button>
+			</div>
+			<?php
+
+			if ( ! empty( $event->name ) ) :
+				?>
+				<h2><?php echo $event->name; ?></h2>
+				<?php
+			endif;
+
+			wpcampus_speakers()->print_proposals_review_table();
+
+			?>
+		</div>
+		<?php
+	}
+
+	/**
+	 *
+	 */
+	public function print_proposals_select_page() {
+		?>
+		<div class="wrap">
+			<div class="wpc-proposals-table-header">
+				<h1><?php echo get_admin_page_title(); ?></h1>
+				<button class="button button-primary wpc-proposals-table-update wpc-proposals-table-update-all">Update all tables</button>
+			</div>
+			<?php wpcampus_speakers()->print_proposals_select_table(); ?>
+		</div>
+		<?php
+	}
 }
 WPCampus_Speakers_Admin::register();

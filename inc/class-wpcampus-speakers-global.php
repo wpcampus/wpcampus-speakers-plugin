@@ -23,25 +23,20 @@ final class WPCampus_Speakers_Global {
 	public static function register() {
 		$plugin = new self();
 
-		// Hide our rest routes.
-		add_filter( 'rest_route_data', array( $plugin, 'filter_rest_route_data' ), 10, 2 );
+		// Process user-submitted proposal rating and assignment.
+		add_action( 'init', array( $plugin, 'process_proposal_rating' ) );
+		add_action( 'init', array( $plugin, 'process_proposal_assign' ) );
 
-		// Restrict access to our API routes.
-		add_filter( 'rest_authentication_errors', array( $plugin, 'restrict_api_access' ) );
-
-		// Filters the REST query for the speaker post types.
-		add_filter( 'rest_profile_query', array( $plugin, 'filter_profile_rest_query' ), 10, 2 );
-		add_filter( 'rest_proposal_query', array( $plugin, 'filter_proposal_rest_query' ), 10, 2 );
-
-		// Filters the post data for a response for the speaker post types.
-		add_filter( 'rest_prepare_profile', array( $plugin, 'prepare_profile_rest_response' ), 10, 2 );
-		add_filter( 'rest_prepare_proposal', array( $plugin, 'prepare_proposal_rest_response' ), 10, 2 );
+		// Set priority later to make sure things are registered.
+		add_action( 'init', array( $plugin, 'process_download_profile_headshots' ), 100 );
+		add_action( 'init', array( $plugin, 'process_download_profile_csv' ), 100 );
 
 		// Filter queries.
 		add_filter( 'query_vars', array( $plugin, 'filter_query_vars' ) );
-		add_filter( 'rest_profile_collection_params', array( $plugin, 'filter_rest_params' ), 10, 2 );
-		add_filter( 'rest_proposal_collection_params', array( $plugin, 'filter_rest_params' ), 10, 2 );
+
+		add_action( 'pre_get_posts', array( $plugin, 'filter_post_query' ), 100 );
 		add_filter( 'posts_clauses', array( $plugin, 'filter_posts_clauses' ), 100, 2 );
+		//add_filter( 'posts_results', array( $plugin, 'filter_posts_results' ), 100, 2 );
 
 		// Register our post types and taxonomies.
 		add_action( 'init', array( $plugin, 'register_custom_post_types_taxonomies' ) );
@@ -56,63 +51,320 @@ final class WPCampus_Speakers_Global {
 		// Add rewrite rules and tags.
 		add_action( 'init', array( $plugin, 'add_rewrite_rules_tags' ) );
 
+		// Add needed styles and scripts.
+		add_action( 'wp_enqueue_scripts', array( $plugin, 'enqueue_styles_scripts' ) );
+
 		// Filter the permalink.
 		add_filter( 'post_type_link', array( $plugin, 'filter_permalink' ), 100, 2 );
 
+		// Filter the post title.
+		//add_filter( 'the_title', array( $plugin, 'filter_the_title' ), 100, 2 );
+		//add_filter( 'wpcampus_page_title', array( $plugin, 'filter_wpcampus_page_title' ) );
+
+		// Filter the content.
+		//add_filter( 'the_content', array( $plugin, 'filter_the_content' ), 100 );
+
+		// Return data to AJAX.
+		add_action( 'wp_ajax_wpc_get_proposals', array( $plugin, 'ajax_get_proposals' ) );
+
+		// Add sessions to contributor pages.
+		add_filter( 'the_posts', array( $plugin, 'add_sessions_to_contributors' ), 100, 2 );
+
+		add_filter( 'get_the_excerpt', array( $plugin, 'get_proposal_excerpt' ), 10, 2 );
+
 	}
 
 	/**
-	 * Returns true if route matches
-	 * one of our speaker post types.
+	 * Process a user submitting a proposal rating.
 	 */
-	public function is_speakers_route( $route, $post_type = null ) {
-		if ( empty( $post_type ) ) {
-			$post_type = '(proposal|profile)';
+	public function process_proposal_rating() {
+
+		if ( ! is_user_logged_in() ) {
+			return;
 		}
-		return preg_match( '/^\/wp(\/v2)?\/' . $post_type . '/i', $route );
+
+		if ( ! ( isset( $_POST['wpc_session_rating'] ) && isset( $_POST['wpc_process_session_rating_nonce'] ) ) ) {
+			return;
+		}
+
+		if ( ! wp_verify_nonce( $_POST['wpc_process_session_rating_nonce'], 'wpc_process_session_rating' ) ) {
+			return ;
+		}
+
+		if ( empty( $_POST['post_id'] ) || ! is_numeric( $_POST['post_id'] ) || 'proposal' != get_post_type( $_POST['post_id'] ) ) {
+			return;
+		}
+
+		$current_user_id = (int) get_current_user_id();
+		$rating = (int) $_POST['wpc_session_rating'];
+
+		update_post_meta( $_POST['post_id'], 'wpc_session_rating_' . $current_user_id, $rating );
+
+		// get_permalink() doesnt work here for some reason.
+		$redirect = add_query_arg( 'rating', 'success', wpcampus_speakers()->get_session_review_permalink( $_POST['post_id'] ) );
+
+		wp_safe_redirect( $redirect );
+		exit;
+
 	}
 
 	/**
-	 * Hide our rest routes from being seen.
+	 * Process a user submitting a proposal assignment.
 	 */
-	public function filter_rest_route_data( $available, $routes ) {
+	public function process_proposal_assign() {
 
-		// Remove routes for "proposal" and "profile".
-		foreach ( $available as $route => $route_data ) {
-			if ( $this->is_speakers_route( $route ) ) {
-				unset( $available[ $route ] );
+		if ( ! is_user_logged_in() ) {
+			return;
+		}
+
+		if ( ! isset( $_POST['wpc_process_session_assign_nonce'] ) ) {
+			return;
+		}
+
+		if ( ! wp_verify_nonce( $_POST['wpc_process_session_assign_nonce'], 'wpc_process_session_assign' ) ) {
+			return ;
+		}
+
+		if ( empty( $_POST['post_id'] ) || ! is_numeric( $_POST['post_id'] ) || 'proposal' != get_post_type( $_POST['post_id'] ) ) {
+			return;
+		}
+
+		$helper = wpcampus_speakers();
+
+		// Update status.
+		if ( isset( $_POST['proposal_status'] ) ) {
+			$proposal_status = sanitize_text_field( $_POST['proposal_status'] );
+			if ( ! empty( $proposal_status ) ) {
+				$helper->update_proposal_status( $_POST['post_id'], $proposal_status );
 			}
 		}
 
-		return $available;
+		// Update session format.
+		if ( isset( $_POST['selected_session_format'] ) ) {
+			$selected_session_format = (int) $_POST['selected_session_format'];
+			if ( $selected_session_format > 0 && term_exists( $selected_session_format, 'session_format' ) ) {
+				update_post_meta( $_POST['post_id'], 'selected_session_format', $selected_session_format );
+			}
+		}
+
+		// Update feedback.
+		if ( isset( $_POST['proposal_feedback'] ) ) {
+			update_post_meta( $_POST['post_id'], 'proposal_feedback', trim( sanitize_text_field( $_POST['proposal_feedback'] ) ) );
+		}
+
+		// get_permalink() doesn't work here for some reason.
+		$redirect = add_query_arg( 'assign', 'success', $helper->get_session_review_permalink( $_POST['post_id'] ) );
+
+		wp_safe_redirect( $redirect );
+		exit;
+
 	}
 
 	/**
-	 * Restrict access to our speakers routes.
+	 * Process someone requesting a profile CSV.
 	 */
-	public function restrict_api_access( $result ) {
+	public function process_download_profile_headshots() {
 
-		// Get the current route.
-		$rest_route = $GLOBALS['wp']->query_vars['rest_route'];
+		if ( ! isset( $_GET['download_profile_headshots_nonce'] ) ) {
+			return;
+		}
 
-		// Restrict access to our speakers routes.
-		if ( ! empty( $rest_route ) && $this->is_speakers_route( $rest_route ) ) {
+		if ( ! wp_verify_nonce( $_GET['download_profile_headshots_nonce'], 'download_profile_headshots' ) ) {
+			return;
+		}
 
-			// Make sure the access request matches.
-			if ( ! empty( $_SERVER['HTTP_WPC_ACCESS'] ) ) {
-				if ( get_option( 'http_wpc_access' ) === $_SERVER['HTTP_WPC_ACCESS'] ) {
-					return true;
-				}
+		if ( ! current_user_can( 'download_wpc_profile_headshots' ) ) {
+			return;
+		}
+
+		$speaker_args = array();
+
+		if ( ! empty( $_GET['proposal_status'] ) ) {
+			$speaker_args['proposal_status'] = $_GET['proposal_status'];
+		}
+
+		$headshots = wpcampus_speakers()->get_profile_headshots( $speaker_args );
+
+		$zip = new ZipArchive();
+
+		// Create a temp file & open it.
+		$tmp_file = tempnam( '.', '' );
+		$zip->open( $tmp_file, ZipArchive::CREATE );
+
+		foreach( $headshots as $file ) {
+
+			// Download file.
+			$download_file = file_get_contents( $file );
+
+			// Add it to the zip.
+			$zip->addFromString( basename( $file ), $download_file );
+
+		}
+
+		$zip->close();
+
+		// Send the file to the browser as a download.
+		header( 'Content-disposition: attachment; filename=wpc-speaker-headshots.zip' );
+		header( 'Content-type: application/zip' );
+		readfile( $tmp_file );
+		//header( 'Content-Length: ' . filesize( $csv_profiles_file_path ) );
+		//header( 'Pragma: no-cache' );
+		//header( 'Expires: 0' );
+
+		exit;
+
+	}
+
+	/**
+	 * Process someone requesting a profile CSV.
+	 */
+	public function process_download_profile_csv() {
+
+		if ( ! isset( $_GET['download_profile_csv_nonce'] ) ) {
+			return;
+		}
+
+		if ( ! wp_verify_nonce( $_GET['download_profile_csv_nonce'], 'download_profile_csv' ) ) {
+			return;
+		}
+
+		if ( ! current_user_can( 'download_wpc_profile_csv' ) ) {
+			return;
+		}
+
+		$profiles_csv = array();
+
+		if ( ! empty( $_GET['confirmation_email'] ) ) {
+			$profiles_csv = $this->get_confirmation_email_csv();
+		}
+
+		if ( empty( $profiles_csv ) ) {
+			$profiles_csv = array();
+		}
+
+		// Create temporary CSV file for the complete photo list.
+		$csv_profiles_filename = 'wpcampus-speakers.csv';
+		$csv_profiles_file_path = "/tmp/{$csv_profiles_filename}";
+		$csv_profiles_file = fopen( $csv_profiles_file_path, 'w' );
+
+		// Write image info to the file.
+		foreach ( $profiles_csv as $profile ) {
+			fputcsv( $csv_profiles_file, $profile );
+		}
+
+		// Close the file.
+		fclose( $csv_profiles_file );
+
+		// Output headers so that the file is downloaded rather than displayed.
+		header( 'Content-type: text/csv' );
+		header( "Content-disposition: attachment; filename = {$csv_profiles_filename}" );
+		header( 'Content-Length: ' . filesize( $csv_profiles_file_path ) );
+		header( 'Pragma: no-cache' );
+		header( 'Expires: 0' );
+
+		// Read the file.
+		readfile( $csv_profiles_file_path );
+
+		exit;
+	}
+
+	/**
+	 *
+	 */
+	public function get_confirmation_email_csv() {
+		$helper = wpcampus_speakers();
+
+		$profile_args = array(
+			'get_proposals' => true,
+			'get_feedback'  => true,
+		);
+
+		if ( ! empty( $_GET['proposal_status'] ) ) {
+			$profile_args['proposal_status'] = sanitize_text_field( $_GET['proposal_status'] );
+		}
+
+		if ( ! empty( $_GET['proposal_event'] ) ) {
+			if ( 'all' == $_GET['proposal_event'] ) {
+
+				// Get all events.
+				$proposal_events = get_terms( array(
+					'taxonomy' => 'proposal_event',
+					'hide_empty' => true,
+					'fields' => 'ids',
+				));
+
+				$profile_args['proposal_event'] = $proposal_events;
+
+				// @TODO fix? otherwise it takes too long.
+				$profile_args['get_proposals'] = false;
+
 			}
+		}
 
-			return new WP_Error(
-				'rest_cannot_access',
-				esc_html__( 'Only authenticated requests can access this REST API route.', 'wpcampus' ),
-				array( 'status' => 401 )
+		if ( empty( $profile_args['proposal_event'] ) ) {
+			$profile_args['proposal_event'] = $helper->get_proposal_event();
+		}
+
+		$profiles = $helper->get_profiles( $profile_args );
+
+		$profiles_csv = [];
+
+		// Create array for CSV. Start with headers.
+		if ( $profile_args['get_proposals'] ) {
+
+			$profiles_csv[] = array(
+				'ID',
+				'Display Name',
+				'First Name',
+				'Last Name',
+				'Email',
+				//'Phone',
+				'Session',
+				'Format',
+				'Status',
+				'Feedback',
+				'Confirmation URL',
+			);
+		} else {
+
+			$profiles_csv[] = array(
+				'ID',
+				'Display Name',
+				'First Name',
+				'Last Name',
+				'Email',
 			);
 		}
 
-		return $result;
+		foreach ( $profiles as $profile ) {
+
+			$profile_row = array(
+				$profile->ID,
+				$profile->display_name,
+				$profile->first_name,
+				$profile->last_name,
+				$profile->email,
+			);
+
+			// Add row for each proposal.
+			if ( $profile_args['get_proposals'] && ! empty( $profile->proposals ) ) {
+
+				foreach ( $profile->proposals as $proposal ) {
+
+					$profile_row[] = $proposal->title;
+					$profile_row[] = $proposal->format_name;
+					$profile_row[] = $proposal->proposal_status;
+					$profile_row[] = $proposal->feedback;
+					$profile_row[] = $helper->get_proposal_confirmation_url( $proposal->ID, $profile->ID );
+
+				}
+			}
+
+			$profiles_csv[] = $profile_row;
+
+		}
+
+		return $profiles_csv;
 	}
 
 	/**
@@ -128,288 +380,61 @@ final class WPCampus_Speakers_Global {
 	}
 
 	/**
-	 * Setup the profile rest query.
-	 */
-	public function filter_profile_rest_query( $args, $request ) {
-
-		$args['post_status'] = 'publish';
-		$args['posts_per_page'] = 100;
-		$args['ignore_sticky_posts'] = true;
-
-		if ( ! empty( $_GET['by_proposal'] ) ) {
-			$args['by_proposal'] = $_GET['by_proposal'];
-
-			// Make sure it's an array.
-			if ( ! is_array( $args['by_proposal'] ) ) {
-				$args['by_proposal'] = explode( ',', str_replace( ' ', '', $args['by_proposal'] ) );
-			}
-
-			// Make sure they're IDs.
-			$args['by_proposal'] = array_filter( $args['by_proposal'], 'is_numeric' );
-
-		}
-
-		if ( ! empty( $_GET['profile_user'] ) && is_numeric( $_GET['profile_user'] ) ) {
-			$args['profile_user'] = sanitize_text_field( $_GET['profile_user'] );
-		}
-
-		if ( ! empty( $_GET['proposal_event'] ) && is_numeric( $_GET['proposal_event'] ) ) {
-			$args['proposal_event'] = sanitize_text_field( $_GET['proposal_event'] );
-		}
-
-		if ( ! empty( $_GET['proposal_status'] ) ) {
-			$args['proposal_status'] = sanitize_text_field( $_GET['proposal_status'] );
-		}
-
-		return $args;
-	}
-
-	/**
-	 * Setup the proposal rest query.
+	 * Statuses:
 	 *
-	 * NOTE: Don't set default proposal status here.
-	 * We do that in the post clauses filter.
+	 * confirmed (has to be for public view)
+	 * declined
+	 * selected
+	 * submitted or NULL
 	 */
-	public function filter_proposal_rest_query( $args, $request ) {
-
-		$args['post_status'] = 'publish';
-		$args['posts_per_page'] = 100;
-		$args['ignore_sticky_posts'] = true;
-
-		if ( ! empty( $_GET['proposal_speaker'] ) && is_numeric( $_GET['proposal_speaker'] ) ) {
-			$args['proposal_speaker'] = sanitize_text_field( $_GET['proposal_speaker'] );
-		}
-
-		if ( ! empty( $_GET['proposal_status'] ) ) {
-			$args['proposal_status'] = sanitize_text_field( $_GET['proposal_status'] );
-		}
-
-		return $args;
-	}
-
-	/**
-	 * Prepare REST response for profiles.
-	 */
-	public function prepare_profile_rest_response( $response, $post ) {
-
-		// We only want to keep specific data.
-		$keys_to_keep = array( 'id', 'status', 'type', 'slug', 'link', 'content', 'excerpt', 'featured_media' );
-		foreach ( $response->data as $key => $value ) {
-			if ( ! in_array( $key, $keys_to_keep ) ) {
-				unset( $response->data[ $key ] );
-			}
-		}
-
-		// Add speaker data.
-		$response = $this->prepare_speaker_rest_response( $response->data, $post->ID );
-
-		return $response;
-	}
-
-	/**
-	 * Prepare REST response for proposals.
-	 */
-	public function prepare_proposal_rest_response( $response, $post ) {
-
-		// We only want to keep specific data.
-		$keys_to_keep = array( 'id', 'status', 'type', 'slug', 'link', 'title', 'content', 'excerpt', 'featured_media', 'session_type' );
-		foreach ( $response->data as $key => $value ) {
-			if ( ! in_array( $key, $keys_to_keep ) ) {
-				unset( $response->data[ $key ] );
-			}
-		}
-
-		// Add proposal status.
-		$proposal_status = wpcampus_speakers()->get_proposal_status( $post->ID );
-		if ( ! empty( $proposal_status ) ) {
-			$proposal_status = strtolower( preg_replace( '/([^a-z])/i', '', $proposal_status ) );
-		}
-		$response->data['proposal_status'] = ! empty( $proposal_status ) ? $proposal_status : null;
-
-		// Get speaker(s) data.
-		$response->data['speakers'] = array();
-
-		if ( function_exists( 'have_rows' ) && have_rows( 'speakers', $post->ID ) ) {
-			while ( have_rows( 'speakers', $post->ID ) ) {
-				the_row();
-
-				$speaker_id = intval( get_sub_field( 'speaker' ) );
-				if ( $speaker_id > 0 ) {
-
-					$speaker_data = array(
-						'id' => $speaker_id,
-						'content' => array(
-							'rendered'  => wpautop( get_post_field( 'post_content', $speaker_id ) ),
-						),
-						'href' => rest_url( 'wp/v2/profile/' . $speaker_id ),
-					);
-
-					// Add to list of speakers.
-					$response->data['speakers'][] = $this->prepare_speaker_rest_response( $speaker_data, $speaker_id );
-
-				}
-			}
-		}
-
-		// Get event(s).
-		$response->data['events'] = array();
-		$events = wp_get_object_terms( $post->ID, 'proposal_event' );
-		if ( ! empty( $events ) ) {
-			foreach ( $events as $event ) {
-				$response->data['events'][] = array(
-					'id'    => $event->term_id,
-					'slug'  => $event->slug,
-					'name'  => $event->name,
-				);
-			}
-		}
-
-		// Get subjects.
-		$response->data['subjects'] = array();
-		$subjects = wp_get_object_terms( $post->ID, 'subjects' );
-		if ( ! empty( $subjects ) ) {
-			foreach ( $subjects as $subject ) {
-				$response->data['subjects'][] = array(
-					'id'    => $subject->term_id,
-					'slug'  => $subject->slug,
-					'name'  => $subject->name,
-				);
-			}
-		}
-
-		// Get WPCampus video post ID.
-		$proposal_video_id = wpcampus_speakers()->get_proposal_video_id( $post->ID );
-
-		// Get the YouTube ID.
-		$youtube_id = $proposal_video_id > 0 ? wpcampus_speakers()->get_video_youtube_id( $proposal_video_id ) : null;
-
-		// Store the YouTube ID and URL.
-		$response->data['session_video'] = ! empty( $youtube_id ) ? $youtube_id : null;
-
-		// Store the video URL.
-		$proposal_video_url = wpcampus_speakers()->get_proposal_video_url( $post->ID );
-
-		// Store the video URL.
-		$response->data['session_video_url'] = ! empty( $proposal_video_url ) ? $proposal_video_url : null;
-
-		// Store the slides URL.
-		$slides_url = wpcampus_speakers()->get_proposal_slides_url( $post->ID );
-		$response->data['session_slides_url'] = ! empty( $slides_url ) ? $slides_url : null;
-
-		return $response;
-	}
-
-	/**
-	 * Add speaker data to a REST response.
-	 */
-	public function prepare_speaker_rest_response( $response, $speaker_id ) {
+	public function get_proposal_status_pieces( $pieces, $proposal_status ) {
 		global $wpdb;
 
-		// Run a query to get all the meta data.
-		$meta_fields = array( 'first_name', 'last_name', 'company', 'company_position', 'company_website', 'website', 'facebook', 'twitter', 'instagram', 'linkedin' );
-		$profile_fields = $wpdb->get_results( $wpdb->prepare( "SELECT meta_key, meta_value FROM {$wpdb->postmeta} WHERE post_id = %s AND meta_key IN ('" . implode( "','", $meta_fields ) . "')", $speaker_id ) );
-
-		// Build display name.
-		$display_name = sanitize_text_field( get_post_meta( $speaker_id, 'display_name', true ) );
-
-		// Add display name.
-		$response['display_name'] = ! empty( $display_name ) ? $display_name : null;
-
-		// If not defined, use first and last name.
-		if ( ! $display_name ) {
-			$first_name = '';
-			$last_name = '';
-			$have_first_name = false;
-			$have_last_name = false;
-			foreach ( $profile_fields as $meta ) {
-				if ( $have_first_name && $have_last_name ) {
-					break;
-				}
-				if ( 'first_name' == $meta->meta_key ) {
-					$first_name = $meta->meta_value;
-					$have_first_name = true;
-				}
-				if ( 'last_name' == $meta->meta_key ) {
-					$last_name = $meta->meta_value;
-					$have_last_name = true;
-				}
-			}
-
-			// Build display name.
-			$display_name = preg_replace( '/([\s]{2,})/', ' ', "{$first_name} {$last_name}" );
+		// Clean up query.
+		if ( ! is_array( $proposal_status ) ) {
+			$proposal_status = explode( ',', str_replace( ' ', '', $proposal_status ) );
 		}
 
-		// If still no display name, use post title.
-		if ( ! $display_name ) {
-			$display_name = get_post_field( 'post_title', $speaker_id );
+		$proposal_status = array_map( 'strtolower', $proposal_status );
+
+		// "Join" to get proposal status.
+		$pieces['join'] .= " LEFT JOIN {$wpdb->postmeta} proposal_status ON proposal_status.post_id = {$wpdb->posts}.ID AND proposal_status.meta_key = 'proposal_status'";
+
+		// If looking for submitted proposals, could be blank.
+		if ( in_array( 'submitted', $proposal_status ) ) {
+			$pieces['where'] .= " AND ( proposal_status.post_id IS NULL OR proposal_status.meta_value IN ('" . implode( "','", $proposal_status ) . "') )";
+		} else {
+			$pieces['where'] .= " AND proposal_status.meta_value IN ('" . implode( "','", $proposal_status ) . "')";
 		}
 
-		// Add display name as title.
-		$response['title'] = array(
-			'rendered' => ! empty( $display_name ) ? $display_name : null,
-		);
-
-		// Add custom data.
-		foreach ( $profile_fields as $meta ) {
-			$meta_value = sanitize_text_field( $meta->meta_value );
-			$response[ $meta->meta_key ] = ! empty( $meta_value ) ? $meta_value : null;
-		}
-
-		// Add the headshot.
-		$headshot = get_the_post_thumbnail_url( $speaker_id, 'thumbnail' );
-		$response['headshot'] = ! empty( $headshot ) ? $headshot : null;
-
-		return $response;
+		return $pieces;
 	}
 
 	/**
-	 * Filter the query params
-	 * allowed by the REST API.
+	 * Filter post queries before they're run.
+	 *
+	 * @param   WP_Query - $query - The WP_Query instance (passed by reference).
 	 */
-	public function filter_rest_params( $query_params, $post_type ) {
+	public function filter_post_query( $query ) {
 
-		switch ( $post_type->name ) {
+		// Our custom session pages are single pages.
+		$wpc_review = $query->get( 'wpc_review' );
+		$wpc_proposal = $query->get( 'wpc_proposal' );
+		if ( ! empty( $wpc_review ) || ! empty( $wpc_proposal ) ) {
 
-			case 'profile':
+			$query->set( 'post_type', 'proposal' );
+			$query->is_single = true;
+			$query->is_singular = true;
+			$query->is_home = false;
 
-				$query_params['profile_user'] = array(
-					'description'   => __( 'Filter the profiles by the user assigned to the profile.', 'wpcampus' ),
-					'type'          => 'integer',
-				);
-
-				$query_params['by_proposal'] = array(
-					'description'   => __( 'Filter the profiles by the profile assigned to a proposal ID.', 'wpcampus' ),
-					'type'          => 'integer',
-				);
-
-				$query_params['proposal_event'] = array(
-					'description'   => __( 'Filter the profiles by the event assigned to their proposal.', 'wpcampus' ),
-					'type'          => 'integer',
-				);
-
-				$query_params['proposal_status'] = array(
-					'description'   => __( 'Filter the profiles by the selection status assigned to their proposal.', 'wpcampus' ),
-					'type'          => 'string',
-				);
-
-				break;
-
-			case 'proposal':
-
-				$query_params['proposal_speaker'] = array(
-					'description'   => __( 'Filter the proposals by their speaker.', 'wpcampus' ),
-					'type'          => 'integer',
-				);
-
-				$query_params['proposal_status'] = array(
-					'description'   => __( 'Filter the proposals by their selection status.', 'wpcampus' ),
-					'type'          => 'string',
-				);
-
-				break;
 		}
+	}
 
-		return $query_params;
+	/**
+	 *
+	 */
+	public function filter_posts_results( $posts, $query ) {
+		return $posts;
 	}
 
 	/**
@@ -418,152 +443,192 @@ final class WPCampus_Speakers_Global {
 	public function filter_posts_clauses( $pieces, $query ) {
 		global $wpdb;
 
-		$post_type = $query->get( 'post_type' );
+		// Only need if querying a session.
+		$wpc_review = $query->get( 'wpc_review' );
+		$wpc_proposal = $query->get( 'wpc_proposal' );
 
-		switch ( $post_type ) {
+		if ( ! empty( $wpc_review ) || ! empty( $wpc_proposal ) ) {
 
-			case 'profile':
+			$session_slug = $wpc_review;
 
-				// Only if we're querying by the profile user.
-				$profile_user = $query->get( 'profile_user' );
-				if ( ! empty( $profile_user ) && is_numeric( $profile_user ) ) {
+			if ( empty( $session_slug ) ) {
+				$session_slug = $wpc_proposal;
+			}
 
-					// "Join" to get profile user.
-					$pieces['join'] .= " LEFT JOIN {$wpdb->postmeta} profile_user ON profile_user.post_id = {$wpdb->posts}.ID AND profile_user.meta_key = 'wordpress_user'";
-					$pieces['where'] .= $wpdb->prepare( ' AND profile_user.meta_value = %s', $profile_user );
+			$pieces = array(
+				'where'    => " AND {$wpdb->posts}.post_type = 'proposal' AND {$wpdb->posts}.post_status IN ('publish')",
+				'groupby'  => '',
+				'join'     => '',
+				'orderby'  => "{$wpdb->posts}.post_title ASC",
+				'distinct' => '',
+				'fields'   => "{$wpdb->posts}.*",
+				'limits'   => '',
+			);
 
+			/*
+			 * Statuses:
+			 *
+			 * confirmed (has to be for public view)
+			 * declined
+			 * selected
+			 * submitted or NULL
+			 */
+			if ( current_user_can( 'view_wpc_proposals' ) ) {
+				$proposal_status = null;
+			} elseif ( empty( $proposal_status ) ) {
+				$proposal_status = 'confirmed';
+			}
+
+			if ( ! empty( $proposal_status ) ) {
+				$pieces = $this->get_proposal_status_pieces( $pieces, $proposal_status );
+			}
+
+			// Make sure folks who don't have capability can't see.
+			if ( ! current_user_can( 'view_wpc_proposals' ) ) {
+				$pieces['where'] .= ' AND 0=1';
+			}
+
+			// Add specific session.
+			$pieces['where'] .= $wpdb->prepare( " AND {$wpdb->posts}.post_name = %s", $session_slug );
+
+			/*// Only if we're querying by the speaker.
+			$proposal_speaker = $query->get( 'proposal_speaker' );
+			if ( ! empty( $proposal_speaker ) && is_numeric( $proposal_speaker ) ) {
+
+				// "Join" to get proposal status.
+				$pieces['join'] .= " LEFT JOIN {$wpdb->postmeta} proposal_speaker ON proposal_speaker.post_id = {$wpdb->posts}.ID AND proposal_speaker.meta_key REGEXP '^speakers\_([0-9]+)\_speaker$'";
+				$pieces['where'] .= $wpdb->prepare( ' AND proposal_speaker.meta_value = %s', $proposal_speaker );
+
+			}
+
+			// Query against proposal status.
+			$proposal_status = $query->get( 'proposal_status' );
+
+			if ( ! $proposal_status && ! empty( $_GET['proposal_status'] ) ) {
+				$proposal_status = sanitize_text_field( $_GET['proposal_status'] );
+			}
+
+			// By default, only get confirmed proposals.
+			if ( empty( $proposal_status ) ) {
+
+				// Don't filter in the admin.
+				if ( ! is_admin() ) {
+					$proposal_status = array( 'confirmed' );
 				}
+			}
 
-				/*
-				 * Set up query by proposal event.
-				 */
-				$proposal_event = $query->get( 'proposal_event' );
-				if ( ! is_numeric( $proposal_event ) || ! $proposal_event ) {
-					$proposal_event = 0;
-				}
+			if ( ! empty( $proposal_status ) ) {
 
-				/*
-				 * Set up query by proposal status.
-				 */
-				$proposal_status = $query->get( 'proposal_status' );
-
-				if ( ! $proposal_status && ! empty( $_GET['proposal_status'] ) ) {
-					$proposal_status = sanitize_text_field( $_GET['proposal_status'] );
-				} elseif ( ! $proposal_status ) {
-					$proposal_status = null;
-				}
-
-				// By default, only get confirmed proposals.
-				if ( empty( $proposal_status ) ) {
-
-					// Don't filter in the admin.
-					if ( ! is_admin() ) {
-						$proposal_status = array( 'confirmed' );
-					}
-				} elseif ( ! is_array( $proposal_status ) ) {
+				// Clean up query.
+				if ( ! is_array( $proposal_status ) ) {
 					$proposal_status = explode( ',', str_replace( ' ', '', $proposal_status ) );
 				}
 
+				$proposal_status = array_map( 'strtolower', $proposal_status );
+
+				// "Join" to get proposal status.
+				$pieces['join'] .= " LEFT JOIN {$wpdb->postmeta} proposal_status ON proposal_status.post_id = {$wpdb->posts}.ID AND proposal_status.meta_key = 'proposal_status'";
+
+				// If looking for submitted proposals, could be blank.
+				if ( in_array( 'submitted', $proposal_status ) ) {
+					$pieces['where'] .= " AND ( proposal_status.post_id IS NULL OR proposal_status.meta_value IN ('" . implode( "','", $proposal_status ) . "') )";
+				} else {
+					$pieces['where'] .= " AND proposal_status.meta_value IN ('" . implode( "','", $proposal_status ) . "')";
+				}
+			}*/
+
+			return $pieces;
+		}
+
+		// What post type are we querying?
+		$post_type = $query->get( 'post_type' );
+
+		if ( 'profile' == $post_type ) {
+
+			// Only if we're querying by the profile user.
+			$profile_user = $query->get( 'profile_user' );
+			if ( ! empty( $profile_user ) && is_numeric( $profile_user ) ) {
+
+				// "Join" to get profile user.
+				$pieces['join'] .= " LEFT JOIN {$wpdb->postmeta} profile_user ON profile_user.post_id = {$wpdb->posts}.ID AND profile_user.meta_key = 'wordpress_user'";
+				$pieces['where'] .= $wpdb->prepare( ' AND profile_user.meta_value = %s', $profile_user );
+
+			}
+
+			/*
+			 * Set up query by proposal event.
+			 */
+			$proposal_event = $query->get( 'proposal_event' );
+			if ( ! is_numeric( $proposal_event ) || ! $proposal_event ) {
+				$proposal_event = 0;
+			}
+
+			/*
+			 * Set up query by proposal status.
+			 */
+			$proposal_status = $query->get( 'proposal_status' );
+
+			if ( ! $proposal_status && ! empty( $_GET['proposal_status'] ) ) {
+				$proposal_status = sanitize_text_field( $_GET['proposal_status'] );
+			} elseif ( ! $proposal_status ) {
+				$proposal_status = null;
+			}
+
+			// By default, only get confirmed proposals.
+			if ( empty( $proposal_status ) ) {
+
+				// Don't filter in the admin.
+				if ( ! is_admin() ) {
+					$proposal_status = array( 'confirmed' );
+				}
+			} elseif ( ! is_array( $proposal_status ) ) {
+				$proposal_status = explode( ',', str_replace( ' ', '', $proposal_status ) );
+			}
+
+			if ( ! empty( $proposal_status ) ) {
+				$proposal_status = array_map( 'strtolower', $proposal_status );
+			}
+
+			/*
+			 * Set up query by proposal ID(s).
+			 */
+			$by_proposal = $query->get( 'by_proposal' );
+
+			if ( ! $by_proposal && ! empty( $_GET['by_proposal'] ) ) {
+				$by_proposal = sanitize_text_field( $_GET['by_proposal'] );
+			} elseif ( ! $by_proposal ) {
+				$by_proposal = null;
+			}
+
+			if ( ! empty( $by_proposal ) ) {
+
+				// Make sure its an array.
+				if ( ! is_array( $by_proposal ) ) {
+					$by_proposal = explode( ',', str_replace( ' ', '', $by_proposal ) );
+				}
+
+				// Make sure they're IDs.
+				$by_proposal = array_filter( $by_proposal, 'is_numeric' );
+
+			}
+
+			if ( ! empty( $proposal_event ) || ! empty( $proposal_status ) || ! empty( $by_proposal ) ) {
+
+				// Join to get proposal information.
+				$pieces['join'] .= " INNER JOIN {$wpdb->postmeta} profile_sel ON profile_sel.meta_value = {$wpdb->posts}.ID AND profile_sel.meta_key REGEXP '^speakers\_([0-9]+)\_speaker$'";
+				$pieces['join'] .= " INNER JOIN {$wpdb->posts} proposal ON proposal.ID = profile_sel.post_id AND proposal.post_type = 'proposal' AND proposal.post_status = 'publish'";
+
+				// Join by event.
+				if ( ! empty( $proposal_event ) ) {
+					$pieces['join'] .= " INNER JOIN {$wpdb->term_relationships} proposal_event_rel ON proposal_event_rel.object_id = proposal.ID";
+					$pieces['join'] .= $wpdb->prepare( " INNER JOIN {$wpdb->term_taxonomy} proposal_event_tax ON proposal_event_tax.term_taxonomy_id = proposal_event_rel.term_taxonomy_id AND proposal_event_tax.taxonomy = 'proposal_event' AND proposal_event_tax.term_id = %s", $proposal_event );
+				}
+
+				// Join by status.
 				if ( ! empty( $proposal_status ) ) {
-					$proposal_status = array_map( 'strtolower', $proposal_status );
-				}
-
-				/*
-				 * Set up query by proposal ID(s).
-				 */
-				$by_proposal = $query->get( 'by_proposal' );
-
-				if ( ! $by_proposal && ! empty( $_GET['by_proposal'] ) ) {
-					$by_proposal = sanitize_text_field( $_GET['by_proposal'] );
-				} elseif ( ! $by_proposal ) {
-					$by_proposal = null;
-				}
-
-				if ( ! empty( $by_proposal ) ) {
-
-					// Make sure its an array.
-					if ( ! is_array( $by_proposal ) ) {
-						$by_proposal = explode( ',', str_replace( ' ', '', $by_proposal ) );
-					}
-
-					// Make sure they're IDs.
-					$by_proposal = array_filter( $by_proposal, 'is_numeric' );
-
-				}
-
-				if ( ! empty( $proposal_event ) || ! empty( $proposal_status ) || ! empty( $by_proposal ) ) {
-
-					// Join to get proposal information.
-					$pieces['join'] .= " INNER JOIN {$wpdb->postmeta} profile_sel ON profile_sel.meta_value = {$wpdb->posts}.ID AND profile_sel.meta_key REGEXP '^speakers\_([0-9]+)\_speaker$'";
-					$pieces['join'] .= " INNER JOIN {$wpdb->posts} proposal ON proposal.ID = profile_sel.post_id AND proposal.post_type = 'proposal' AND proposal.post_status = 'publish'";
-
-					// Join by event.
-					if ( ! empty( $proposal_event ) ) {
-						$pieces['join'] .= " INNER JOIN {$wpdb->term_relationships} proposal_event_rel ON proposal_event_rel.object_id = proposal.ID";
-						$pieces['join'] .= $wpdb->prepare( " INNER JOIN {$wpdb->term_taxonomy} proposal_event_tax ON proposal_event_tax.term_taxonomy_id = proposal_event_rel.term_taxonomy_id AND proposal_event_tax.taxonomy = 'proposal_event' AND proposal_event_tax.term_id = %s", $proposal_event );
-					}
-
-					// Join by status.
-					if ( ! empty( $proposal_status ) ) {
-
-						// "Join" to get proposal status.
-						$pieces['join'] .= " LEFT JOIN {$wpdb->postmeta} proposal_status ON proposal_status.post_id = proposal.ID AND proposal_status.meta_key = 'proposal_status'";
-
-						// If looking for submitted proposals, could be blank.
-						if ( in_array( 'submitted', $proposal_status ) ) {
-							$pieces['where'] .= " AND ( proposal_status.post_id IS NULL OR proposal_status.meta_value IN ('" . implode( "','", $proposal_status ) . "') )";
-						} else {
-							$pieces['where'] .= " AND proposal_status.meta_value IN ('" . implode( "','", $proposal_status ) . "')";
-						}
-					}
-
-					// Only by proposal ID.
-					if ( ! empty( $by_proposal ) ) {
-						$pieces['where'] .= " AND proposal.ID IN ('" . implode( "','", $by_proposal ) . "')";
-					}
-				}
-
-				break;
-
-			case 'proposal':
-
-				// Only if we're querying by the speaker.
-				$proposal_speaker = $query->get( 'proposal_speaker' );
-				if ( ! empty( $proposal_speaker ) && is_numeric( $proposal_speaker ) ) {
 
 					// "Join" to get proposal status.
-					$pieces['join'] .= " LEFT JOIN {$wpdb->postmeta} proposal_speaker ON proposal_speaker.post_id = {$wpdb->posts}.ID AND proposal_speaker.meta_key REGEXP '^speakers\_([0-9]+)\_speaker$'";
-					$pieces['where'] .= $wpdb->prepare( ' AND proposal_speaker.meta_value = %s', $proposal_speaker );
-
-				}
-
-				// Query against proposal status.
-				$proposal_status = $query->get( 'proposal_status' );
-
-				if ( ! $proposal_status && ! empty( $_GET['proposal_status'] ) ) {
-					$proposal_status = sanitize_text_field( $_GET['proposal_status'] );
-				}
-
-				// By default, only get confirmed proposals.
-				if ( empty( $proposal_status ) ) {
-
-					// Don't filter in the admin.
-					if ( ! is_admin() ) {
-						$proposal_status = array( 'confirmed' );
-					}
-				}
-
-				if ( ! empty( $proposal_status ) ) {
-
-					// Clean up query.
-					if ( ! is_array( $proposal_status ) ) {
-						$proposal_status = explode( ',', str_replace( ' ', '', $proposal_status ) );
-					}
-
-					$proposal_status = array_map( 'strtolower', $proposal_status );
-
-					// "Join" to get proposal status.
-					$pieces['join'] .= " LEFT JOIN {$wpdb->postmeta} proposal_status ON proposal_status.post_id = {$wpdb->posts}.ID AND proposal_status.meta_key = 'proposal_status'";
+					$pieces['join'] .= " LEFT JOIN {$wpdb->postmeta} proposal_status ON proposal_status.post_id = proposal.ID AND proposal_status.meta_key = 'proposal_status'";
 
 					// If looking for submitted proposals, could be blank.
 					if ( in_array( 'submitted', $proposal_status ) ) {
@@ -573,7 +638,55 @@ final class WPCampus_Speakers_Global {
 					}
 				}
 
-				break;
+				// Only by proposal ID.
+				if ( ! empty( $by_proposal ) ) {
+					$pieces['where'] .= " AND proposal.ID IN ('" . implode( "','", $by_proposal ) . "')";
+				}
+			}
+
+			return $pieces;
+		}
+
+		if ( 'proposal' == $post_type ) {
+
+			// Only if we're querying by the speaker.
+			$proposal_speaker = $query->get( 'proposal_speaker' );
+			if ( ! empty( $proposal_speaker ) && is_numeric( $proposal_speaker ) ) {
+
+				// "Join" to get proposal status.
+				$pieces['join'] .= " LEFT JOIN {$wpdb->postmeta} proposal_speaker ON proposal_speaker.post_id = {$wpdb->posts}.ID AND proposal_speaker.meta_key REGEXP '^speakers\_([0-9]+)\_speaker$'";
+				$pieces['where'] .= $wpdb->prepare( ' AND proposal_speaker.meta_value = %s', $proposal_speaker );
+
+			}
+
+			/*
+			 * Query against proposal status.
+			 *
+			 * confirmed (has to be for public view)
+			 * declined
+			 * selected
+			 * submitted or NULL
+			 */
+			$proposal_status = $query->get( 'proposal_status' );
+
+			if ( ! $proposal_status && ! empty( $_GET['proposal_status'] ) ) {
+				$proposal_status = sanitize_text_field( $_GET['proposal_status'] );
+			}
+
+			// By default, only get confirmed proposals.
+			if ( empty( $proposal_status ) ) {
+
+				// Don't filter in the admin.
+				if ( ! is_admin() ) {
+					$proposal_status = array( 'confirmed' );
+				}
+			}
+
+			if ( ! empty( $proposal_status ) ) {
+				$pieces = $this->get_proposal_status_pieces( $pieces, $proposal_status );
+			}
+
+			return $pieces;
 		}
 
 		return $pieces;
@@ -613,7 +726,7 @@ final class WPCampus_Speakers_Global {
 			'hierarchical'        => false,
 			'public'              => false,
 			'show_ui'             => true,
-			'show_in_menu'        => 'wpc-speakers',
+			'show_in_menu'        => 'wpc-sessions',
 			'menu_icon'           => 'dashicons-format-aside',
 			'show_in_admin_bar'   => true,
 			'show_in_nav_menus'   => false,
@@ -623,8 +736,17 @@ final class WPCampus_Speakers_Global {
 			'publicly_queryable'  => false,
 			'capability_type'     => array( 'proposal', 'proposals' ),
 			'rewrite'             => false,
-			'show_in_rest'        => true,
+			'show_in_rest'        => false,
 		));
+
+		/*[edit_post] => edit_proposal
+            [read_post] => read_proposal
+            [delete_post] => delete_proposal
+            [edit_posts] => edit_proposals
+            [edit_others_posts] => edit_others_proposals
+            [publish_posts] => publish_proposals
+            [read_private_posts] => read_private_proposals
+            [create_posts] => edit_proposals*/
 
 		register_post_type( 'profile', array(
 			'label'               => __( 'Profiles', 'wpcampus' ),
@@ -653,7 +775,7 @@ final class WPCampus_Speakers_Global {
 			'hierarchical'        => false,
 			'public'              => false,
 			'show_ui'             => true,
-			'show_in_menu'        => 'wpc-speakers',
+			'show_in_menu'        => 'wpc-sessions',
 			'menu_icon'           => 'dashicons-admin-users',
 			'show_in_admin_bar'   => true,
 			'show_in_nav_menus'   => false,
@@ -663,8 +785,17 @@ final class WPCampus_Speakers_Global {
 			'publicly_queryable'  => false,
 			'capability_type'     => array( 'profile', 'profiles' ),
 			'rewrite'             => false,
-			'show_in_rest'        => true,
+			'show_in_rest'        => false,
 		));
+
+		/*[edit_post] => edit_profile
+            [read_post] => read_profile
+            [delete_post] => delete_profile
+            [edit_posts] => edit_profiles
+            [edit_others_posts] => edit_others_profiles
+            [publish_posts] => publish_profiles
+            [read_private_posts] => read_private_profiles
+            [create_posts] => edit_profiles*/
 
 		// @TODO Only be able to access with authentication?
 		register_taxonomy( 'proposal_event', array( 'proposal' ), array(
@@ -697,31 +828,62 @@ final class WPCampus_Speakers_Global {
 			'show_in_rest'      => true,
 		));
 
-		register_taxonomy( 'session_type', array( 'proposal' ), array(
+		register_taxonomy( 'preferred_session_format', array( 'proposal' ), array(
 			'labels'            => array(
-				'name'                       => _x( 'Session Types', 'Taxonomy General Name', 'wpcampus' ),
-				'singular_name'              => _x( 'Session Type', 'Taxonomy Singular Name', 'wpcampus' ),
-				'menu_name'                  => __( 'Session Types', 'wpcampus' ),
-				'all_items'                  => __( 'All Session Types', 'wpcampus' ),
-				'new_item_name'              => __( 'New Session Type', 'wpcampus' ),
-				'add_new_item'               => __( 'Add New Session Type', 'wpcampus' ),
-				'edit_item'                  => __( 'Edit Session Type', 'wpcampus' ),
-				'update_item'                => __( 'Update Session Type', 'wpcampus' ),
-				'view_item'                  => __( 'View Session Type', 'wpcampus' ),
-				'separate_items_with_commas' => __( 'Separate session types with commas', 'wpcampus' ),
-				'add_or_remove_items'        => __( 'Add or remove session types', 'wpcampus' ),
-				'choose_from_most_used'      => __( 'Choose from the most used session types', 'wpcampus' ),
-				'popular_items'              => __( 'Popular session types', 'wpcampus' ),
-				'search_items'               => __( 'Search Session Types', 'wpcampus' ),
-				'not_found'                  => __( 'No session types found.', 'wpcampus' ),
-				'no_terms'                   => __( 'No session types', 'wpcampus' ),
-				'items_list'                 => __( 'Session types list', 'wpcampus' ),
-				'items_list_navigation'      => __( 'Session types list navigation', 'wpcampus' ),
+				'name'                       => _x( 'Preferred Session Formats', 'Taxonomy General Name', 'wpcampus' ),
+				'singular_name'              => _x( 'Preferred Session Format', 'Taxonomy Singular Name', 'wpcampus' ),
+				'menu_name'                  => __( 'Preferred Session Formats', 'wpcampus' ),
+				'all_items'                  => __( 'All Session Formats', 'wpcampus' ),
+				'new_item_name'              => __( 'New Session Format', 'wpcampus' ),
+				'add_new_item'               => __( 'Add New Session Format', 'wpcampus' ),
+				'edit_item'                  => __( 'Edit Session Format', 'wpcampus' ),
+				'update_item'                => __( 'Update Session Format', 'wpcampus' ),
+				'view_item'                  => __( 'View Session Format', 'wpcampus' ),
+				'separate_items_with_commas' => __( 'Separate session formats with commas', 'wpcampus' ),
+				'add_or_remove_items'        => __( 'Add or remove session formats', 'wpcampus' ),
+				'choose_from_most_used'      => __( 'Choose from the most used session formats', 'wpcampus' ),
+				'popular_items'              => __( 'Popular session formats', 'wpcampus' ),
+				'search_items'               => __( 'Search Session Formats', 'wpcampus' ),
+				'not_found'                  => __( 'No session formats found.', 'wpcampus' ),
+				'no_terms'                   => __( 'No session formats', 'wpcampus' ),
+				'items_list'                 => __( 'Session formats list', 'wpcampus' ),
+				'items_list_navigation'      => __( 'Session formats list navigation', 'wpcampus' ),
 			),
 			'hierarchical'      => false,
 			'public'            => false,
 			'show_ui'           => true,
-			'show_admin_column' => true,
+			'show_admin_column' => false,
+			'show_in_nav_menus' => false,
+			'show_tagcloud'     => false,
+			// 'meta_box_cb'       => 'post_categories_meta_box', // Causes term ID string issues
+			'show_in_rest'      => false,
+		));
+
+		register_taxonomy( 'session_format', array( 'proposal' ), array(
+			'labels'            => array(
+				'name'                       => _x( 'Session Formats', 'Taxonomy General Name', 'wpcampus' ),
+				'singular_name'              => _x( 'Session Format', 'Taxonomy Singular Name', 'wpcampus' ),
+				'menu_name'                  => __( 'Session Formats', 'wpcampus' ),
+				'all_items'                  => __( 'All Session Formats', 'wpcampus' ),
+				'new_item_name'              => __( 'New Session Format', 'wpcampus' ),
+				'add_new_item'               => __( 'Add New Session Format', 'wpcampus' ),
+				'edit_item'                  => __( 'Edit Session Format', 'wpcampus' ),
+				'update_item'                => __( 'Update Session Format', 'wpcampus' ),
+				'view_item'                  => __( 'View Session Format', 'wpcampus' ),
+				'separate_items_with_commas' => __( 'Separate session formats with commas', 'wpcampus' ),
+				'add_or_remove_items'        => __( 'Add or remove session formats', 'wpcampus' ),
+				'choose_from_most_used'      => __( 'Choose from the most used session formats', 'wpcampus' ),
+				'popular_items'              => __( 'Popular session formats', 'wpcampus' ),
+				'search_items'               => __( 'Search Session Formats', 'wpcampus' ),
+				'not_found'                  => __( 'No session formats found.', 'wpcampus' ),
+				'no_terms'                   => __( 'No session formats', 'wpcampus' ),
+				'items_list'                 => __( 'Session formats list', 'wpcampus' ),
+				'items_list_navigation'      => __( 'Session formats list navigation', 'wpcampus' ),
+			),
+			'hierarchical'      => false,
+			'public'            => false,
+			'show_ui'           => true,
+			'show_admin_column' => false,
 			'show_in_nav_menus' => false,
 			'show_tagcloud'     => false,
 			// 'meta_box_cb'       => 'post_categories_meta_box', // Causes term ID string issues
@@ -790,21 +952,24 @@ final class WPCampus_Speakers_Global {
 
 			// Sort "Beginner", "Intermediate" then "Advanced" as first terms.
 			usort( $terms, function( $a, $b ) {
-				if ( $a->slug == $b->slug ) {
-					return 0;
-				}
-				if ( 'beginner' == $a->slug ) {
+				if ( 'beginner' == $a->slug && 'beginner' != $b->slug ) {
 					return -1;
-				}
-				if ( 'beginner' == $b->slug ) {
+				} elseif ( 'beginner' == $b->slug && 'beginner' != $a->slug ) {
 					return 1;
 				}
-				if ( 'intermediate' == $a->slug && 'beginner' != $b->slug ) {
+
+				if ( 'intermediate' == $a->slug && ! in_array( $b->slug, array( 'beginner', 'intermediate' ) ) ) {
 					return -1;
+				} elseif ( 'intermediate' == $b->slug && ! in_array( $a->slug, array( 'beginner', 'intermediate' ) ) ) {
+					return 1;
 				}
-				if ( 'advanced' == $a->slug && 'beginner' != $b->slug && 'intermediate' != $b->slug ) {
+
+				if ( 'advanced' == $a->slug && ! in_array( $b->slug, array( 'beginner', 'intermediate', 'advanced' ) ) ) {
 					return -1;
+				} elseif ( 'intermediate' == $b->slug && ! in_array( $a->slug, array( 'beginner', 'intermediate', 'advanced' ) ) ) {
+					return 1;
 				}
+
 				return strcmp( $a->name, $b->name );
 			});
 
@@ -845,8 +1010,22 @@ final class WPCampus_Speakers_Global {
 	 * Add rewrite rules.
 	 */
 	public function add_rewrite_rules_tags() {
-		add_rewrite_tag( '%wpc_session%', '([^&]+)' );
-		add_rewrite_rule( '^session/([^\/\s]+)/?', 'index.php?wpc_session=$matches[1]', 'top' );
+		add_rewrite_tag( '%wpc_review%', '([^\/]+)' );
+		add_rewrite_tag( '%wpc_review_main%', '([^\/]+)' );
+		add_rewrite_tag( '%wpc_proposal%', '([^\/]+)' );
+		add_rewrite_rule( '^review/([^\/\s]+)/?', 'index.php?wpc_review=$matches[1]', 'top' );
+		add_rewrite_rule( '^review/?', 'index.php?pagename=review&wpc_review_main=1', 'top' );
+		add_rewrite_rule( '^session/([^\/\s]+)/?', 'index.php?wpc_proposal=$matches[1]', 'top' );
+	}
+
+	/**
+	 *
+	 */
+	public function enqueue_styles_scripts() {
+		$wpc_review_main = (bool) get_query_var( 'wpc_review_main' );
+		if ( true === $wpc_review_main ) {
+			wpcampus_speakers()->load_review_assets();
+		}
 	}
 
 	/**
@@ -861,8 +1040,226 @@ final class WPCampus_Speakers_Global {
 		if ( 'proposal' != $post->post_type ) {
 			return $post_link;
 		}
-		return wpcampus_speakers()->get_session_permalink( $post->ID );
+		return wpcampus_speakers()->get_session_permalink( $post->ID, $post );
 	}
+
+	/**
+	 * Filter post titles.
+	 *
+	 * @access  public
+	 * @param   $post_title - string - the default post title.
+	 * @param   $post_id - int - the post ID.
+	 * @return  string - the filtered post title.
+	 */
+	public function filter_the_title( $post_title, $post_id ) {
+
+		// TODO: Hard setting the ID keeps from running a DB query.
+		if ( 21326 != $post_id ) {
+			return $post_title;
+		}
+
+		if ( is_admin() ) {
+			return $post_title;
+		}
+
+		// Returns the session slug.
+		$session = wpcampus_speakers()->is_session_page();
+		if ( empty( $session ) ) {
+			return $post_title;
+		}
+
+		// Get proposal title.
+		$proposal = wpcampus_network()->get_post_by_name( $session, 'proposal' );
+		if ( empty( $proposal->post_title ) ) {
+			return $post_title;
+		}
+
+		return $proposal->post_title;
+	}
+
+	/**
+	 *
+	 */
+	public function filter_wpcampus_page_title( $title ) {
+		return $title;
+	}
+
+	/**
+	 * Filter the post content.
+	 *
+	 * @access  public
+	 * @param   $content - string - the default post content.
+	 * @return  string - the filtered content.
+	 */
+	public function filter_the_content( $content ) {
+		$helper = wpcampus_speakers();
+
+		// Returns the session slug.
+		$session = $helper->is_session_page();
+		if ( empty( $session ) ) {
+			return $content;
+		}
+
+		// Get proposal title.
+		$proposal = wpcampus_network()->get_post_by_name( $session, 'proposal' );
+		if ( empty( $proposal->post_content ) ) {
+			return $content;
+		}
+
+		$content = wpautop( $proposal->post_content );
+
+		$video_html = '';
+
+		// If URL is hard-set, return first.
+		$video_url = get_post_meta( $proposal->ID, 'session_video_url', true );
+		if ( ! empty( $video_url ) ) {
+
+			// @TODO: Why wont this work with embeds? How does it work on WPCampus 2016 site?
+			$video_html = '<iframe title="" src="' . $video_url . '" />';
+
+		} else {
+
+			$proposal_video_id  = $helper->get_proposal_video_id( $proposal->ID );
+
+			// This means its one of our video posts so get its URL.
+			if ( ! empty( $proposal_video_id ) ) {
+
+				$video_url = $helper->get_video_url( $proposal_video_id );
+
+				if ( ! empty( $video_url ) ) {
+					$video_html = wp_oembed_get( $video_url, array(
+						'height' => 450,
+					));
+				}
+			}
+		}
+
+		if ( empty( $video_html ) ) {
+			return $content;
+		}
+
+		return $content . '<h2>' . __( 'Session video', 'wpcampus' ) . '</h2>' . $video_html;
+	}
+
+	/**
+	 * Get the proposals via an AJAX request.
+	 */
+	public function ajax_get_proposals() {
+
+		$args = array();
+
+		if ( ! empty( $_GET['orderby'] ) ) {
+			$args['orderby'] = sanitize_text_field( $_GET['orderby'] );
+		}
+
+		if ( ! empty( $_GET['order'] ) ) {
+			$args['order'] = sanitize_text_field( $_GET['order'] );
+		}
+
+		if ( ! empty( $_GET['getUserViewed'] ) ) {
+			$args['get_user_viewed'] = sanitize_text_field( $_GET['getUserViewed'] );
+		}
+
+		if ( ! empty( $_GET['getUserRating'] ) ) {
+			$args['get_user_rating'] = sanitize_text_field( $_GET['getUserRating'] );
+		}
+
+		if ( ! empty( $_GET['getAvgRating'] ) ) {
+			$args['get_avg_rating'] = sanitize_text_field( $_GET['getAvgRating'] );
+		}
+
+		if ( ! empty( $_GET['proposalStatus'] ) ) {
+			$args['proposal_status'] = sanitize_text_field( $_GET['proposalStatus'] );
+		}
+
+		if ( ! empty( $_GET['getProfiles'] ) ) {
+			$args['get_profiles'] = (bool) sanitize_text_field( $_GET['getProfiles'] );
+		}
+
+		if ( ! empty( $_GET['getSubjects'] ) ) {
+			$args['get_subjects'] = (bool) sanitize_text_field( $_GET['getSubjects'] );
+		}
+
+		if ( ! empty( $_GET['subjects'] ) ) {
+			$args['subjects'] = sanitize_text_field( $_GET['subjects'] );
+		}
+
+		if ( ! empty( $_GET['byProfile'] ) ) {
+			$args['by_profile'] = sanitize_text_field( $_GET['byProfile'] );
+		}
+
+		if ( ! empty( $_GET['proposalEvent'] ) ) {
+			$args['proposal_event'] = sanitize_text_field( $_GET['proposalEvent'] );
+		}
+
+		echo json_encode( wpcampus_speakers()->get_proposals( $args ) );
+		wp_die();
+	}
+
+	public function sort_by_post_date_gmt_desc( $a, $b ) {
+		$t1 = strtotime( $a->post_date_gmt );
+		$t2 = strtotime( $b->post_date_gmt );
+		return $t2 - $t1;
+	}
+
+	public function get_proposal_excerpt( $excerpt, $post ) {
+		if ( 'proposal' != $post->post_type ) {
+			return $excerpt;
+		}
+
+		if ( ! empty( $post->post_excerpt ) ) {
+			$proposal_excerpt = $post->post_excerpt;
+		} else if ( ! empty( $post->excerpt ) ) {
+			$proposal_excerpt = $post->excerpt;
+		} else {
+			$proposal_excerpt = null;
+		}
+
+		if ( empty( $proposal_excerpt ) ) {
+			return $excerpt;
+		}
+
+		if ( ! empty( $proposal_excerpt['raw'] ) ) {
+			return $proposal_excerpt['raw'];
+		}
+
+		if ( ! empty( $proposal_excerpt ) && is_string( $proposal_excerpt ) ) {
+			return $proposal_excerpt;
+		}
+
+		return $excerpt;
+	}
+
+	public function add_sessions_to_contributors( $posts, $query ) {
+
+		if ( ! $query->is_author() ) {
+			return $posts;
+		}
+
+		$author_id = $query->get( 'author' );
+
+		if ( empty( $author_id ) ) {
+			return $posts;
+		}
+
+		$proposals = wpcampus_speakers()->get_proposals(
+			array(
+				'by_wp_user'   => (int) $author_id,
+				'get_profiles' => false,
+				'get_headshot' => false,
+				'proposal_status' => 'confirmed',
+			)
+		);
+
+		if ( empty( $proposals ) ) {
+			return $posts;
+		}
+
+		$posts = array_merge( $posts, $proposals );
+
+		usort( $posts, array( $this, 'sort_by_post_date_gmt_desc' ) );
+
+		return $posts;
 	}
 }
 WPCampus_Speakers_Global::register();

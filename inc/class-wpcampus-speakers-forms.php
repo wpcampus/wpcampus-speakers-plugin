@@ -1074,7 +1074,7 @@ final class WPCampus_Speakers_Forms {
 		}
 
 		$message .= '<p>Congratulations and thank you from the entire WPCampus community.</p>
-			<p><strong>Please review and confirm your acceptance by Tuesday, May 28.</strong>';
+			<p><strong>Please review and confirm your acceptance by Monday, June 3.</strong>';
 
 		if ( ! empty( $feedback ) ) {
 			$message .= ' We\'ve also included feedback for you to consider as you confirm and work on your session. Let us know if you have any questions about our notes.';

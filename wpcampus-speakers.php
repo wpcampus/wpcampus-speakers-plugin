@@ -1000,6 +1000,9 @@ final class WPCampus_Speakers {
 
 		if ( ! empty( $proposals ) ) {
 
+			$utc_timezone = new DateTimeZone( 'UTC' );
+			$now = new DateTime( 'now', $utc_timezone );
+
 			foreach ( $proposals as &$proposal ) {
 
 				$content = ! empty( $proposal->content ) ? $proposal->content : null;
@@ -1049,6 +1052,7 @@ final class WPCampus_Speakers {
 						$date = '2017-01-23 00:00:00';
 						$proposal->post_date = $date;
 						$proposal->post_date_gmt = $date;
+						$proposal->event_permalink = 'https://online.wpcampus.org/';
 						$proposal->permalink = 'https://online.wpcampus.org/schedule/' . $proposal->permalink;
 						break;
 
@@ -1056,6 +1060,7 @@ final class WPCampus_Speakers {
 						$date = '2018-01-30 00:00:00';
 						$proposal->post_date = $date;
 						$proposal->post_date_gmt = $date;
+						$proposal->event_permalink = 'https://online.wpcampus.org/';
 						$proposal->permalink = 'https://online.wpcampus.org/schedule/' . $proposal->permalink;
 						break;
 
@@ -1063,6 +1068,7 @@ final class WPCampus_Speakers {
 						$date = '2019-01-31 00:00:00';
 						$proposal->post_date = $date;
 						$proposal->post_date_gmt = $date;
+						$proposal->event_permalink = 'https://online.wpcampus.org/';
 						$proposal->permalink = 'https://online.wpcampus.org/schedule/' . $proposal->permalink;
 						break;
 
@@ -1070,6 +1076,7 @@ final class WPCampus_Speakers {
 						$date = '2016-07-15 00:00:00';
 						$proposal->post_date = $date;
 						$proposal->post_date_gmt = $date;
+						$proposal->event_permalink = 'https://2016.wpcampus.org/';
 						$proposal->permalink = 'https://2016.wpcampus.org/schedule/' . $proposal->permalink;
 						break;
 
@@ -1077,6 +1084,7 @@ final class WPCampus_Speakers {
 						$date = '2017-07-14 00:00:00';
 						$proposal->post_date = $date;
 						$proposal->post_date_gmt = $date;
+						$proposal->event_permalink = 'https://2017.wpcampus.org/';
 						$proposal->permalink = 'https://2017.wpcampus.org/schedule/' . $proposal->permalink;
 						break;
 
@@ -1084,7 +1092,16 @@ final class WPCampus_Speakers {
 						$date = '2018-07-13 00:00:00';
 						$proposal->post_date = $date;
 						$proposal->post_date_gmt = $date;
+						$proposal->event_permalink = 'https://2018.wpcampus.org/';
 						$proposal->permalink = 'https://2018.wpcampus.org/schedule/' . $proposal->permalink;
+						break;
+
+					case 'wpcampus-2019':
+						$date = '2019-07-26 00:00:00';
+						$proposal->post_date = $date;
+						$proposal->post_date_gmt = $date;
+						$proposal->event_permalink = 'https://2019.wpcampus.org/';
+						$proposal->permalink = 'https://2019.wpcampus.org/schedule/' . $proposal->permalink;
 						break;
 
 					default:
@@ -1092,6 +1109,11 @@ final class WPCampus_Speakers {
 						break;
 
 				}
+
+				$post_date_gmt = new DateTime( $proposal->post_date_gmt, $utc_timezone );
+
+				$proposal->future = $post_date_gmt > $now;
+
 			}
 
 			if ( $get_row ) {

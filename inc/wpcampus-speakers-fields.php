@@ -128,7 +128,7 @@ function wpcampus_speakers_add_fields() {
 				'required' => 0,
 				'conditional_logic' => 0,
 				'collapsed' => 'field_5a361daa9530d',
-				'min' => 1,
+				'min' => 0,
 				'max' => 0,
 				'layout' => 'block',
 				'button_label' => __( 'Add Speaker', 'wpcampus-speakers' ),

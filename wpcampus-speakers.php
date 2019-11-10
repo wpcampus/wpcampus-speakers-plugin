@@ -655,26 +655,27 @@ final class WPCampus_Speakers {
 
 		// Merge incoming with defaults.
 		$args = wp_parse_args( $args, array(
-			'p'                => 0,
-			'post__in'         => '',
-			'orderby'          => 'post_title',
-			'order'            => 'ASC',
-			'user_id'          => null,
-			'get_user_viewed'  => false,
-			'get_user_rating'  => false,
-			'get_avg_rating'   => false,
-			'by_profile'       => null,
-			'by_wp_user'       => null,
-			'proposal_event'   => '',
-			'proposal_status'  => '',
-			'format'           => null,
-			'subject'          => '',
-			'search'           => '',
-			'get_profiles'     => false,
-			'get_headshot'     => false,
-			'get_feedback'     => false,
-			'get_subjects'     => false,
-			'get_wp_user'      => false,
+			'p'               => 0,
+			'post__in'        => '',
+			'orderby'         => 'post_title',
+			'order'           => 'ASC',
+			'user_id'         => null,
+			'get_user_viewed' => false,
+			'get_user_rating' => false,
+			'get_avg_rating'  => false,
+			'by_profile'      => null,
+			'by_wp_user'      => null,
+			'proposal_event'  => '',
+			'proposal_status' => '',
+			'assets'          => null,
+			'format'          => null,
+			'subject'         => '',
+			'search'          => '',
+			'get_profiles'    => false,
+			'get_headshot'    => false,
+			'get_feedback'    => false,
+			'get_subjects'    => false,
+			'get_wp_user'     => false,
 		));
 
 		$user_id = 0;
@@ -699,6 +700,21 @@ final class WPCampus_Speakers {
 				$get_user_rating = false;
 			}
 		}
+
+		$hasAssets = [];
+		$validAssets = [ 'slides', 'video' ];
+		if ( ! empty( $args['assets'] ) ) {
+
+		    if ( ! is_array( $args['assets'] ) ) {
+			    $args['assets'] = explode( ',', $args['assets'] );
+            }
+
+		    foreach ( $args['assets'] as $asset ) {
+		        if ( in_array( $asset, $validAssets ) ) {
+		            $hasAssets[] = $asset;
+                }
+            }
+        }
 
 		$proposals_query = $wpdb->prepare(
 			"SELECT DISTINCT posts.ID,
@@ -882,6 +898,17 @@ final class WPCampus_Speakers {
 		}
 
 		$proposals_query .= " WHERE posts.post_type = 'proposal' AND posts.post_status = 'publish'";
+
+		if ( ! empty( $hasAssets ) ) {
+
+		    if ( in_array( 'slides', $hasAssets ) ) {
+		        $proposals_query .= " AND session_slides_url.meta_value IS NOT NULL AND session_slides_url.meta_value != ''";
+            }
+
+			if ( in_array( 'video', $hasAssets ) ) {
+				$proposals_query .= " AND ( ( session_video_id.meta_value IS NOT NULL AND session_video_id.meta_value != '' AND session_video_post.ID IS NOT NULL ) OR ( session_video_url.meta_value IS NOT NULL AND session_video_url.meta_value != '' ) )";
+			}
+        }
 
 		if ( ! empty( $args['proposal_event'] ) ) {
 
@@ -1826,6 +1853,7 @@ final class WPCampus_Speakers {
 			'proposal_status' => 'confirmed',
 			'get_profiles'    => true,
 			'get_wp_user'     => true,
+			'assets'          => null,
 			//'user_id'          => null,
 			//'get_user_viewed'  => false,
 			//'get_user_rating'  => false,
